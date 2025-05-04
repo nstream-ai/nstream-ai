@@ -1,0 +1,184 @@
+# Cobra CLI configuration file
+
+# The project name, used for generating code and documentation
+project_name: nsai
+
+# The package name, usually the Go module path
+package_name: github.com/nstream-ai/nsai
+
+# The license for generated files (optional)
+license: MIT
+
+# The author information (optional)
+author: "Shiv shiv@nstream.ai"
+
+# List of commands that should be created automatically
+commands:
+  - name: init
+    description: "Initialize project & cloud for Nstream AI"
+  - name: create
+    description: "Create cluster, provider, tools and prompt templates"
+  - name: delete
+    description: "Delete cluster, provider, tools and prompt templates"
+  - name: update
+    description: "Update cluster, provider, tools and prompt templates"
+  - name: use
+    description: "Use Project & Cluster"
+  - name: chat
+    description: "Use chat for a complete RAG with a combination of Models, Knowledgbases and Adapters"
+  - name: sql
+    description: "Use SQL playground to interact with data streams from connectors & graph nodes"
+  - name: query
+    description: "Use query to test a knowledgebase and tools"
+
+
+# Boilerplate settings for generated files
+boilerplate: |
+  /*
+  Copyright 2024 Nstream AI.
+  Licensed under the MIT License.
+  */
+
+# Default command to run if no subcommand is specified
+default_command: help
+
+# Flag settings
+flags:
+  global:
+    - name: verbose
+      shorthand: v
+      type: bool
+      default: false
+      usage: "Enable verbose output"
+    - name: help
+      shorthand: v
+      type: bool
+      default: false
+      usage: "Enable help for command"
+
+  local:
+    init:
+      - name: cloud
+        shorthand: cloud
+        type: string
+        default: "aws"
+        usage: "define the cloud provider"
+      - name: project
+        shorthand: proj
+        type: string
+        default: "dev"
+        usage: "define the project"
+    create:
+      - name: cluster
+        shorthand: clus
+        type: string
+        default: "sandbox"
+        usage: "Cluster to create for Nstream AI"
+      - name: tool
+        shorthand: tool
+        type: string
+        default: "default"
+        usage: "Tool to create for Nstream AI cluster"
+      - name: provider
+        shorthand: prov
+        type: string
+        default: "megamodel"
+        usage: "Provider to create for Nstream AI like Model Repo, Mega Model, Knowledgebases"
+    update:
+      - name: cluster
+        shorthand: clus
+        type: string
+        default: "sandbox"
+        usage: "Cluster to update for Nstream AI"
+      - name: tool
+        shorthand: tool
+        type: string
+        default: "default"
+        usage: "Tool to update for Nstream AI cluster"
+      - name: provider
+        shorthand: prov
+        type: string
+        default: "megamodel"
+        usage: "Provider to update for Nstream AI like Model Repo, Mega Model, Knowledgebases"
+    delete:
+      - name: cluster
+        shorthand: clus
+        type: string
+        default: "sandbox"
+        usage: "Cluster to delete for Nstream AI"
+      - name: tool
+        shorthand: tool
+        type: string
+        default: "default"
+        usage: "Tool to delete for Nstream AI cluster"
+      - name: provider
+        shorthand: prov
+        type: string
+        default: "megamodel"
+        usage: "Provider to delete for Nstream AI like Model Repo, Mega Model, Knowledgebases"
+    use:
+      - name: project
+        shorthand: proj
+        type: string
+        default: "dev"
+        usage: "Project to use"
+      - name: cluster
+        shorthand: prov
+        type: string
+        default: "sandbox"
+        usage: "Cluster to use"
+    chat: 
+      - name: finetuner
+        shorthand: fine
+        type: string
+        default: "sandbox"
+        usage: "Finetuner to use to chat"
+      - name: basemodel
+        shorthand: base
+        type: string
+        default: "default"
+        usage: "Finetuner to use to chat"
+      - name: megamodel
+        shorthand: mega
+        type: string
+        default: "default"
+        usage: "Finetuner to use to chat"
+      - name: adapter
+        shorthand: adap
+        type: string
+        default: "default"
+        usage: "Finetuner to use to chat"
+    sql:
+      - name: connector
+        shorthand: conn
+        type: string
+        default: "default"
+        usage: "Connector to use for SQL source"
+      - name: node
+        shorthand: node
+        type: string
+        default: "default"
+        usage: "Node to use for SQL source"
+    query: 
+      - name: knowledgebase
+        shorthand: know
+        type: string
+        default: "default"
+        usage: "Knowledgebase to use for querying"
+      - name: tool
+        shorthand: tool
+        type: string
+        default: "default"
+        usage: "Tool to use for querying"
+
+
+# Output format for help and documentation
+output:
+  format: markdown
+  dir: docs/
+
+# Enable Bash, Zsh, Fish shell completion
+completion:
+  bash: true
+  zsh: true
+  fish: true

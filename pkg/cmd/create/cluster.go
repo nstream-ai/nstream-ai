@@ -1,0 +1,246 @@
+package create
+
+import (
+	"fmt"
+
+	"github.com/nstreama-ai/nstream-ai-cli/pkg/banner"
+	"github.com/nstreama-ai/nstream-ai-cli/pkg/config"
+	"github.com/spf13/cobra"
+)
+
+var (
+	clusterName    string
+	principalName  string
+	assumeRoleName string
+	stsDuration    int
+)
+
+// NewClusterCmd creates the cluster command
+func NewClusterCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "cluster [cluster-name]",
+		Short: "Create a new NStream AI cluster",
+		Long:  `Create a new NStream AI cluster with specified configuration`,
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return createCluster(args[0])
+		},
+	}
+
+	cmd.Flags().StringP("type", "t", "basic", "Cluster type (basic/standard/enterprise)")
+	cmd.Flags().StringP("cloud", "c", "gcp", "Cloud provider (aws/gcp/azure)")
+	cmd.Flags().StringP("region", "r", "", "Region for the cluster")
+	cmd.Flags().StringP("bucket", "b", "", "Bucket name for storage")
+	cmd.Flags().StringP("role", "p", "", "Role/principal to assume for bucket access")
+
+	return cmd
+}
+
+func createCluster(name string) error {
+	// Print banner
+	banner.PrintBanner()
+	fmt.Println("Creating a new NStream AI cluster...")
+	fmt.Println()
+
+	// Check if config exists
+	if !config.ConfigExists() {
+		fmt.Println("No configuration found. You need to authenticate first.")
+		fmt.Println("\nPlease choose one of the following options:")
+		fmt.Println("1. Sign in to an existing account: 'nsai auth signin'")
+		fmt.Println("2. Create a new account: 'nsai auth signup'")
+		fmt.Println("\nAfter authentication, run 'nsai create cluster " + name + "' again")
+		return fmt.Errorf("authentication required")
+	}
+
+	// Load config to check user credentials
+	cfg, err := config.LoadConfig()
+	if err != nil {
+		return fmt.Errorf("failed to load config: %v", err)
+	}
+
+	// Check if user is authenticated
+	if cfg.User.AuthToken == "" {
+		fmt.Println("No authentication token found. You need to sign in first.")
+		fmt.Println("\nRun 'nsai auth signin' to authenticate")
+		fmt.Println("After authentication, run 'nsai create cluster " + name + "' again")
+		return fmt.Errorf("authentication required")
+	}
+
+	// Check if user exists
+	if cfg.User.Email == "" {
+		fmt.Println("No user found. You need to sign in first.")
+		fmt.Println("\nRun 'nsai auth signin' to authenticate")
+		fmt.Println("After authentication, run 'nsai create cluster " + name + "' again")
+		return fmt.Errorf("authentication required")
+	}
+
+	// Get cluster type
+	clusterType, err := getClusterType()
+	if err != nil {
+		return err
+	}
+
+	// Get cloud provider
+	cloudProvider, err := getCloudProvider()
+	if err != nil {
+		return err
+	}
+
+	// Get region
+	region, err := getRegion(cloudProvider)
+	if err != nil {
+		return err
+	}
+
+	// Get bucket name
+	fmt.Print("Enter your bucket name: ")
+	var bucket string
+	fmt.Scanln(&bucket)
+
+	// Get role/principal for bucket access
+	fmt.Printf("\nEnter the name for your bucket access %s: ", getRoleType(cloudProvider))
+	var userRole string
+	fmt.Scanln(&userRole)
+
+	// Get NStream service role
+	done := make(chan bool)
+	go ShowLoading("Fetching NStream service role", done)
+	serviceRole, err := DummyGetServiceRole(cloudProvider)
+	if err != nil {
+		done <- true
+		return fmt.Errorf("failed to get service role: %v", err)
+	}
+	done <- true
+
+	// Show cloud-specific setup instructions
+	fmt.Println("\nPlease follow these steps to set up bucket access:")
+	fmt.Println(GetCloudSetupInstructions(cloudProvider, serviceRole, userRole))
+	fmt.Print("\nPress Enter when you have completed the setup...")
+	fmt.Scanln()
+
+	// Verify bucket access
+	done = make(chan bool)
+	go ShowLoading("Verifying bucket access", done)
+	if err := VerifyBucketAccess(cloudProvider, bucket, userRole); err != nil {
+		done <- true
+		return fmt.Errorf("failed to verify bucket access: %v", err)
+	}
+	done <- true
+
+	// Check resource readiness
+	done = make(chan bool)
+	go ShowLoading("Checking resource readiness", done)
+	if err := CheckResourceReadiness(cloudProvider, bucket, userRole); err != nil {
+		done <- true
+		return fmt.Errorf("resources not ready: %v", err)
+	}
+	done <- true
+
+	// Create cluster
+	done = make(chan bool)
+	go ShowLoading("Creating your NStream AI cluster", done)
+
+	clusterConfig, err := DummyCreateCluster(name, clusterType, cloudProvider, region, bucket, userRole)
+	if err != nil {
+		done <- true
+		return fmt.Errorf("failed to create cluster: %v", err)
+	}
+	done <- true
+
+	// Update config
+	cfg.Cluster = *clusterConfig
+	if err := config.SaveConfig(cfg); err != nil {
+		return fmt.Errorf("failed to save config: %v", err)
+	}
+
+	fmt.Println("\nSuccessfully created cluster!")
+	fmt.Printf("Name: %s\n", clusterConfig.Name)
+	fmt.Printf("Type: %s\n", clusterType)
+	fmt.Printf("Cloud Provider: %s\n", cloudProvider)
+	fmt.Printf("Region: %s\n", region)
+	fmt.Printf("Bucket: %s\n", bucket)
+	fmt.Printf("Bucket Access %s: %s\n", getRoleType(cloudProvider), userRole)
+	fmt.Printf("NStream Service Role: %s\n", serviceRole)
+	fmt.Println("\nYou can now use this cluster with 'nsai cluster use " + name + "'")
+
+	return nil
+}
+
+func getClusterType() (string, error) {
+	fmt.Println("\nAvailable cluster types:")
+	fmt.Println("1. Basic (Free)")
+	fmt.Println("2. Standard (Requires credits)")
+	fmt.Println("3. Enterprise (Requires credits)")
+	fmt.Print("\nSelect cluster type (1-3): ")
+
+	var choice int
+	fmt.Scanln(&choice)
+
+	switch choice {
+	case 1:
+		return "basic", nil
+	case 2:
+		return "standard", nil
+	case 3:
+		return "enterprise", nil
+	default:
+		return "", fmt.Errorf("invalid cluster type selection")
+	}
+}
+
+func getCloudProvider() (string, error) {
+	fmt.Println("\nAvailable cloud providers:")
+	fmt.Println("1. AWS")
+	fmt.Println("2. GCP")
+	fmt.Println("3. Azure")
+	fmt.Print("\nSelect cloud provider (1-3): ")
+
+	var choice int
+	fmt.Scanln(&choice)
+
+	switch choice {
+	case 1:
+		return "aws", nil
+	case 2:
+		return "gcp", nil
+	case 3:
+		return "azure", nil
+	default:
+		return "", fmt.Errorf("invalid cloud provider selection")
+	}
+}
+
+func getRegion(provider string) (string, error) {
+	regions := GetCloudRegions(provider)
+	if len(regions) == 0 {
+		return "", fmt.Errorf("no regions available for provider %s", provider)
+	}
+
+	fmt.Printf("\nAvailable regions for %s:\n", provider)
+	for i, region := range regions {
+		fmt.Printf("%d. %s\n", i+1, region)
+	}
+	fmt.Print("\nSelect region (1-", len(regions), "): ")
+
+	var choice int
+	fmt.Scanln(&choice)
+
+	if choice < 1 || choice > len(regions) {
+		return "", fmt.Errorf("invalid region selection")
+	}
+
+	return regions[choice-1], nil
+}
+
+func getRoleType(provider string) string {
+	switch provider {
+	case "aws":
+		return "IAM Role"
+	case "gcp":
+		return "Service Account"
+	case "azure":
+		return "Service Principal"
+	default:
+		return "Role"
+	}
+}
