@@ -19,11 +19,32 @@ brew install nstream-ai-cli
 
 ## Authentication
 
-Before using the CLI, you need to authenticate:
+Before using the CLI, you need to authenticate. The CLI provides two authentication methods:
+
+### Sign In
 
 ```bash
-nsai auth --token <your-token>
+nsai auth signin
 ```
+
+This will guide you through an interactive sign-in process where you'll:
+1. Enter your email
+2. Receive a password via email
+3. Enter the password to complete authentication
+
+### Sign Up
+
+```bash
+nsai auth signup
+```
+
+This will guide you through creating a new account where you'll:
+1. Enter your email
+2. Enter your organization name
+3. Enter your name
+4. Enter your role
+5. Receive a password via email
+6. Enter the password to complete registration
 
 ## Commands
 
@@ -32,53 +53,69 @@ nsai auth --token <your-token>
 Initialize a new project and cloud environment:
 
 ```bash
-nsai init --cloud <provider> --project <project-name>
+nsai init [flags]
 ```
+
+Flags:
+- `--user, -u`: Username for authentication
+- `--password, -p`: Password for authentication
+- `--cluster, -c`: Cluster name to use
+- `--create-cluster`: Create a new cluster (requires additional flags)
+- `--region`: Region for cluster creation
+- `--cloud`: Cloud provider for cluster creation
+- `--bucket`: Bucket name for cluster creation
+- `--role`: Role for cluster creation
 
 ### Create Resources
 
-Create various resources in Nstream AI:
+#### Create Cluster
 
 ```bash
-nsai create --type <resource-type> --name <resource-name>
+nsai create cluster <cluster-name> [flags]
 ```
 
-Resource types include:
-- cluster
-- provider
-- tool
+Flags:
+- `--type, -t`: Cluster type (basic/standard/enterprise) [default: basic]
+- `--cloud, -c`: Cloud provider (aws/gcp/azure) [default: gcp]
+- `--region, -r`: Region for the cluster
+- `--bucket, -b`: Bucket name for storage
+- `--role, -p`: Role/principal to assume for bucket access
+
+The command will guide you through:
+1. Selecting cluster type
+2. Choosing cloud provider
+3. Selecting region
+4. Setting up bucket access
+5. Verifying bucket access
+6. Creating the cluster
 
 ### Delete Resources
 
-Delete existing resources:
-
 ```bash
-nsai delete --type <resource-type> --name <resource-name>
+nsai delete [resource-type] [resource-name]
 ```
 
 ### Get Information
 
-Retrieve information about resources:
-
 ```bash
-nsai get --type <resource-type> --name <resource-name>
+nsai get [resource-type] [resource-name]
 ```
 
 ### Update Resources
 
-Update specific fields of resources:
-
 ```bash
-nsai patch --type <resource-type> --name <resource-name>
+nsai patch [resource-type] [resource-name]
 ```
 
 ### Set Active Context
 
-Set the active project and cluster:
-
 ```bash
-nsai use --project <project-name> --cluster <cluster-name>
+nsai use [flags]
 ```
+
+Flags:
+- `--project, -p`: Project to set as active
+- `--cluster, -c`: Cluster to set as active
 
 ## Global Flags
 

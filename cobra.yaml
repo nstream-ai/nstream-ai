@@ -17,9 +17,17 @@ commands:
   - name: init
     description: "Initialize project & cloud for Nstream AI"
   - name: auth
-    description: "Authenticate with Nstream AI services"
+    description: "Authentication commands for Nstream AI"
+    subcommands:
+      - name: signin
+        description: "Sign in to Nstream AI platform"
+      - name: signup
+        description: "Sign up for Nstream AI platform"
   - name: create
-    description: "Create resources in Nstream AI"
+    description: "Create NStream AI resources"
+    subcommands:
+      - name: cluster
+        description: "Create a new NStream AI cluster"
   - name: delete
     description: "Delete resources from Nstream AI"
   - name: get
@@ -55,57 +63,57 @@ flags:
 
   local:
     init:
-      - name: cloud
-        shorthand: c
+      - name: user
+        shorthand: u
         type: string
-        default: "aws"
-        usage: "Cloud provider to initialize (aws, gcp, azure)"
-      - name: project
+        usage: "Username for authentication"
+      - name: password
         shorthand: p
         type: string
-        default: "dev"
-        usage: "Project name to initialize"
-    auth:
-      - name: token
-        shorthand: t
+        usage: "Password for authentication"
+      - name: cluster
+        shorthand: c
         type: string
-        usage: "Authentication token"
+        usage: "Cluster name to use"
+      - name: create-cluster
+        type: bool
+        usage: "Create a new cluster (requires additional flags)"
+      - name: region
+        type: string
+        usage: "Region for cluster creation"
+      - name: cloud
+        type: string
+        usage: "Cloud provider for cluster creation"
+      - name: bucket
+        type: string
+        usage: "Bucket name for cluster creation"
+      - name: role
+        type: string
+        usage: "Role for cluster creation"
     create:
-      - name: type
-        shorthand: t
-        type: string
-        usage: "Resource type to create (cluster, provider, tool)"
-      - name: name
-        shorthand: n
-        type: string
-        usage: "Name of the resource to create"
-    delete:
-      - name: type
-        shorthand: t
-        type: string
-        usage: "Resource type to delete (cluster, provider, tool)"
-      - name: name
-        shorthand: n
-        type: string
-        usage: "Name of the resource to delete"
-    get:
-      - name: type
-        shorthand: t
-        type: string
-        usage: "Resource type to get information about"
-      - name: name
-        shorthand: n
-        type: string
-        usage: "Name of the resource to get information about"
-    patch:
-      - name: type
-        shorthand: t
-        type: string
-        usage: "Resource type to patch"
-      - name: name
-        shorthand: n
-        type: string
-        usage: "Name of the resource to patch"
+      cluster:
+        - name: type
+          shorthand: t
+          type: string
+          default: "basic"
+          usage: "Cluster type (basic/standard/enterprise)"
+        - name: cloud
+          shorthand: c
+          type: string
+          default: "gcp"
+          usage: "Cloud provider (aws/gcp/azure)"
+        - name: region
+          shorthand: r
+          type: string
+          usage: "Region for the cluster"
+        - name: bucket
+          shorthand: b
+          type: string
+          usage: "Bucket name for storage"
+        - name: role
+          shorthand: p
+          type: string
+          usage: "Role/principal to assume for bucket access"
     use:
       - name: project
         shorthand: p
