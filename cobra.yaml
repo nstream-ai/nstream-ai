@@ -16,21 +16,18 @@ author: "Shiv shiv@nstream.ai"
 commands:
   - name: init
     description: "Initialize project & cloud for Nstream AI"
+  - name: auth
+    description: "Authenticate with Nstream AI services"
   - name: create
-    description: "Create cluster, provider, tools and prompt templates"
+    description: "Create resources in Nstream AI"
   - name: delete
-    description: "Delete cluster, provider, tools and prompt templates"
-  - name: update
-    description: "Update cluster, provider, tools and prompt templates"
+    description: "Delete resources from Nstream AI"
+  - name: get
+    description: "Get information about Nstream AI resources"
+  - name: patch
+    description: "Update specific fields of Nstream AI resources"
   - name: use
-    description: "Use Project & Cluster"
-  - name: chat
-    description: "Use chat for a complete RAG with a combination of Models, Knowledgbases and Adapters"
-  - name: sql
-    description: "Use SQL playground to interact with data streams from connectors & graph nodes"
-  - name: query
-    description: "Use query to test a knowledgebase and tools"
-
+    description: "Set active project and cluster"
 
 # Boilerplate settings for generated files
 boilerplate: |
@@ -51,126 +48,73 @@ flags:
       default: false
       usage: "Enable verbose output"
     - name: help
-      shorthand: v
+      shorthand: h
       type: bool
       default: false
-      usage: "Enable help for command"
+      usage: "Show help for command"
 
   local:
     init:
       - name: cloud
-        shorthand: cloud
+        shorthand: c
         type: string
         default: "aws"
-        usage: "define the cloud provider"
+        usage: "Cloud provider to initialize (aws, gcp, azure)"
       - name: project
-        shorthand: proj
+        shorthand: p
         type: string
         default: "dev"
-        usage: "define the project"
+        usage: "Project name to initialize"
+    auth:
+      - name: token
+        shorthand: t
+        type: string
+        usage: "Authentication token"
     create:
-      - name: cluster
-        shorthand: clus
+      - name: type
+        shorthand: t
         type: string
-        default: "sandbox"
-        usage: "Cluster to create for Nstream AI"
-      - name: tool
-        shorthand: tool
+        usage: "Resource type to create (cluster, provider, tool)"
+      - name: name
+        shorthand: n
         type: string
-        default: "default"
-        usage: "Tool to create for Nstream AI cluster"
-      - name: provider
-        shorthand: prov
-        type: string
-        default: "megamodel"
-        usage: "Provider to create for Nstream AI like Model Repo, Mega Model, Knowledgebases"
-    update:
-      - name: cluster
-        shorthand: clus
-        type: string
-        default: "sandbox"
-        usage: "Cluster to update for Nstream AI"
-      - name: tool
-        shorthand: tool
-        type: string
-        default: "default"
-        usage: "Tool to update for Nstream AI cluster"
-      - name: provider
-        shorthand: prov
-        type: string
-        default: "megamodel"
-        usage: "Provider to update for Nstream AI like Model Repo, Mega Model, Knowledgebases"
+        usage: "Name of the resource to create"
     delete:
-      - name: cluster
-        shorthand: clus
+      - name: type
+        shorthand: t
         type: string
-        default: "sandbox"
-        usage: "Cluster to delete for Nstream AI"
-      - name: tool
-        shorthand: tool
+        usage: "Resource type to delete (cluster, provider, tool)"
+      - name: name
+        shorthand: n
         type: string
-        default: "default"
-        usage: "Tool to delete for Nstream AI cluster"
-      - name: provider
-        shorthand: prov
+        usage: "Name of the resource to delete"
+    get:
+      - name: type
+        shorthand: t
         type: string
-        default: "megamodel"
-        usage: "Provider to delete for Nstream AI like Model Repo, Mega Model, Knowledgebases"
+        usage: "Resource type to get information about"
+      - name: name
+        shorthand: n
+        type: string
+        usage: "Name of the resource to get information about"
+    patch:
+      - name: type
+        shorthand: t
+        type: string
+        usage: "Resource type to patch"
+      - name: name
+        shorthand: n
+        type: string
+        usage: "Name of the resource to patch"
     use:
       - name: project
-        shorthand: proj
+        shorthand: p
         type: string
-        default: "dev"
-        usage: "Project to use"
+        usage: "Project to set as active"
       - name: cluster
-        shorthand: prov
+        shorthand: c
         type: string
-        default: "sandbox"
-        usage: "Cluster to use"
-    chat: 
-      - name: finetuner
-        shorthand: fine
-        type: string
-        default: "sandbox"
-        usage: "Finetuner to use to chat"
-      - name: basemodel
-        shorthand: base
-        type: string
-        default: "default"
-        usage: "Finetuner to use to chat"
-      - name: megamodel
-        shorthand: mega
-        type: string
-        default: "default"
-        usage: "Finetuner to use to chat"
-      - name: adapter
-        shorthand: adap
-        type: string
-        default: "default"
-        usage: "Finetuner to use to chat"
-    sql:
-      - name: connector
-        shorthand: conn
-        type: string
-        default: "default"
-        usage: "Connector to use for SQL source"
-      - name: node
-        shorthand: node
-        type: string
-        default: "default"
-        usage: "Node to use for SQL source"
-    query: 
-      - name: knowledgebase
-        shorthand: know
-        type: string
-        default: "default"
-        usage: "Knowledgebase to use for querying"
-      - name: tool
-        shorthand: tool
-        type: string
-        default: "default"
-        usage: "Tool to use for querying"
-
+        usage: "Cluster to set as active"
 
 # Output format for help and documentation
 output:
