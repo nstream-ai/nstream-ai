@@ -11,13 +11,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var (
-	clusterName    string
-	principalName  string
-	assumeRoleName string
-	stsDuration    int
-)
-
 // NewClusterCmd creates the cluster command
 func NewClusterCmd() *cobra.Command {
 	cmd := &cobra.Command{
