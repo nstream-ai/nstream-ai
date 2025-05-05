@@ -5,6 +5,7 @@ import (
 	authcmd "github.com/nstreama-ai/nstream-ai-cli/pkg/cmd/auth"
 	createcmd "github.com/nstreama-ai/nstream-ai-cli/pkg/cmd/create"
 	initcmd "github.com/nstreama-ai/nstream-ai-cli/pkg/cmd/init"
+	usecmd "github.com/nstreama-ai/nstream-ai-cli/pkg/cmd/use"
 	"github.com/spf13/cobra"
 )
 
@@ -31,6 +32,9 @@ func init() {
 
 	// Add create command
 	rootCmd.AddCommand(createcmd.NewCreateCmd())
+
+	// Add use command
+	rootCmd.AddCommand(usecmd.NewUseCmd())
 }
 
 func Execute() error {

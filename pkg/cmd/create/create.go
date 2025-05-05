@@ -12,8 +12,11 @@ func NewCreateCmd() *cobra.Command {
 		Long:  `Create various NStream AI resources like clusters, principals, etc.`,
 	}
 
-	// Add cluster subcommand
-	cmd.AddCommand(NewClusterCmd())
+	// Add subcommands
+	cmd.AddCommand(
+		NewClusterCmd(),
+		NewBucketCmd(),
+	)
 
 	return cmd
 }

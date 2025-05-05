@@ -82,12 +82,114 @@ Flags:
 - `--role, -p`: Role/principal to assume for bucket access
 
 The command will guide you through:
-1. Selecting cluster type
-2. Choosing cloud provider
-3. Selecting region
-4. Setting up bucket access
-5. Verifying bucket access
-6. Creating the cluster
+1. Selecting cluster type (Basic/Standard/Enterprise)
+2. Choosing cloud provider (AWS/GCP/Azure)
+3. Selecting region for the chosen cloud provider
+4. Setting up bucket access:
+   - Shows existing buckets compatible with the selected cloud provider
+   - Option to use an existing bucket or create a new one
+   - If creating new, prompts for bucket name
+5. Setting up bucket access role/principal
+6. Verifying bucket access
+7. Creating the cluster
+
+Example:
+```bash
+# Interactive mode
+nsai create cluster my-cluster
+
+# With flags
+nsai create cluster my-cluster --type basic --cloud aws --region us-east-1 --bucket my-bucket --role my-role
+```
+
+#### Create Bucket
+
+```bash
+nsai create bucket [bucket-name] [flags]
+```
+
+Flags:
+- `--name, -n`: Bucket name (optional, will prompt if not provided)
+- `--provider, -p`: Cloud provider (aws/gcp/azure)
+- `--region, -r`: Region for the bucket
+
+The command will:
+1. Check for existing buckets compatible with the cluster's cloud provider
+2. If compatible buckets exist:
+   - Display them in a table with details
+   - Ask if you want to use an existing bucket
+   - If yes, let you select one from the list
+   - If no, proceed with creating a new bucket
+3. If creating a new bucket:
+   - Prompt for bucket name (if not provided)
+   - Select region based on cloud provider
+   - Create the bucket
+
+Example:
+```bash
+# Interactive mode
+nsai create bucket
+
+# With name
+nsai create bucket my-bucket
+
+# With all flags
+nsai create bucket my-bucket --provider aws --region us-east-1
+```
+
+### Use Resources
+
+#### Use Cluster
+
+```bash
+nsai use cluster [cluster-name] [flags]
+```
+
+Flags:
+- `--name, -n`: Cluster name (optional, will prompt for selection if not provided)
+
+The command will:
+1. List available clusters
+2. Let you select a cluster to use
+3. Set the selected cluster as the current context
+
+Example:
+```bash
+# Interactive mode
+nsai use cluster
+
+# Direct selection
+nsai use cluster my-cluster
+```
+
+#### Use Bucket
+
+```bash
+nsai use bucket [bucket-name] [flags]
+```
+
+Flags:
+- `--name, -n`: Bucket name (optional, will prompt for selection if not provided)
+- `--cluster, -c`: Cluster name (optional, will use current cluster or prompt for selection)
+
+The command will:
+1. Check if a cluster context is set or provided
+2. List available buckets compatible with the cluster's cloud provider
+3. Let you select a bucket to use
+4. Verify cloud provider compatibility between cluster and bucket
+5. Set the selected bucket as the current context
+
+Example:
+```bash
+# Interactive mode
+nsai use bucket
+
+# With bucket name
+nsai use bucket my-bucket
+
+# With cluster context
+nsai use bucket my-bucket --cluster my-cluster
+```
 
 ### Delete Resources
 
@@ -106,16 +208,6 @@ nsai get [resource-type] [resource-name]
 ```bash
 nsai patch [resource-type] [resource-name]
 ```
-
-### Set Active Context
-
-```bash
-nsai use [flags]
-```
-
-Flags:
-- `--project, -p`: Project to set as active
-- `--cluster, -c`: Cluster to set as active
 
 ## Global Flags
 

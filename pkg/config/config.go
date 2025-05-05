@@ -18,6 +18,7 @@ type ClusterConfig struct {
 	CloudProvider string `json:"cloud_provider"`
 	Region        string `json:"region"`
 	Bucket        string `json:"bucket"`
+	Role          string `json:"role"`
 	ClusterToken  string `json:"cluster_token"`
 }
 

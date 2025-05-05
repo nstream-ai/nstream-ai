@@ -2,6 +2,9 @@ package create
 
 import (
 	"fmt"
+	"os"
+	"text/tabwriter"
+	"time"
 
 	"github.com/nstreama-ai/nstream-ai-cli/pkg/banner"
 	"github.com/nstreama-ai/nstream-ai-cli/pkg/config"
@@ -92,10 +95,69 @@ func createCluster(name string) error {
 		return err
 	}
 
-	// Get bucket name
-	fmt.Print("Enter your bucket name: ")
+	// Check for existing buckets with matching cloud provider
+	done := make(chan bool)
+	go ShowLoading("Checking existing buckets", done)
+
+	// Mock gRPC call to get buckets
+	time.Sleep(1 * time.Second)
+	buckets, err := mockListBuckets("")
+	if err != nil {
+		done <- true
+		return fmt.Errorf("failed to get buckets: %v", err)
+	}
+	done <- true
+
+	// Filter buckets by cloud provider
+	var compatibleBuckets []MockBucket
+	for _, bucket := range buckets {
+		if bucket.Provider == cloudProvider {
+			compatibleBuckets = append(compatibleBuckets, bucket)
+		}
+	}
+
 	var bucket string
-	fmt.Scanln(&bucket)
+	// If there are compatible buckets, ask if user wants to use one
+	if len(compatibleBuckets) > 0 {
+		fmt.Printf("\nFound %d existing bucket(s) compatible with %s cloud provider:\n", len(compatibleBuckets), cloudProvider)
+		w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+		fmt.Fprintln(w, "ID\tName\tRegion\tProvider\tSize\tCreated At")
+		for i, b := range compatibleBuckets {
+			fmt.Fprintf(w, "%d. %s\t%s\t%s\t%s\t%s\n",
+				i+1,
+				b.Name,
+				b.Region,
+				b.Provider,
+				b.Size,
+				b.CreatedAt,
+			)
+		}
+		w.Flush()
+
+		fmt.Print("\nWould you like to use one of these buckets? (y/n): ")
+		var useExisting string
+		fmt.Scanln(&useExisting)
+
+		if useExisting == "y" || useExisting == "yes" {
+			fmt.Print("\nEnter the number of the bucket to use: ")
+			var choice int
+			fmt.Scanln(&choice)
+
+			if choice < 1 || choice > len(compatibleBuckets) {
+				return fmt.Errorf("invalid bucket choice")
+			}
+
+			bucket = compatibleBuckets[choice-1].Name
+		} else {
+			// Get new bucket name
+			fmt.Print("\nEnter your bucket name: ")
+			fmt.Scanln(&bucket)
+		}
+	} else {
+		// Get new bucket name
+		fmt.Print("\nEnter your bucket name: ")
+		fmt.Scanln(&bucket)
+	}
 
 	// Get role/principal for bucket access
 	fmt.Printf("\nEnter the name for your bucket access %s: ", getRoleType(cloudProvider))
@@ -103,7 +165,7 @@ func createCluster(name string) error {
 	fmt.Scanln(&userRole)
 
 	// Get NStream service role
-	done := make(chan bool)
+	done = make(chan bool)
 	go ShowLoading("Fetching NStream service role", done)
 	serviceRole, err := DummyGetServiceRole(cloudProvider)
 	if err != nil {

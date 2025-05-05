@@ -83,11 +83,44 @@ func DummyCreateCluster(name, clusterType, cloudProvider, region, bucket, role s
 func GetCloudRegions(provider string) []string {
 	switch provider {
 	case "aws":
-		return []string{"us-east-1", "us-west-2", "eu-west-1", "ap-southeast-1"}
+		return []string{
+			"us-east-1",      // US East (N. Virginia)
+			"us-east-2",      // US East (Ohio)
+			"us-west-1",      // US West (N. California)
+			"us-west-2",      // US West (Oregon)
+			"eu-west-1",      // Europe (Ireland)
+			"eu-west-2",      // Europe (London)
+			"eu-central-1",   // Europe (Frankfurt)
+			"ap-southeast-1", // Asia Pacific (Singapore)
+			"ap-southeast-2", // Asia Pacific (Sydney)
+			"ap-northeast-1", // Asia Pacific (Tokyo)
+		}
 	case "gcp":
-		return []string{"us-central1", "us-east1", "europe-west1", "asia-east1"}
+		return []string{
+			"us-central1",     // Iowa
+			"us-east1",        // South Carolina
+			"us-east4",        // Northern Virginia
+			"us-west1",        // Oregon
+			"europe-west1",    // Belgium
+			"europe-west2",    // London
+			"europe-west3",    // Frankfurt
+			"asia-east1",      // Taiwan
+			"asia-southeast1", // Singapore
+			"asia-northeast1", // Tokyo
+		}
 	case "azure":
-		return []string{"eastus", "westus", "northeurope", "southeastasia"}
+		return []string{
+			"eastus",        // East US
+			"eastus2",       // East US 2
+			"westus",        // West US
+			"westus2",       // West US 2
+			"northeurope",   // North Europe
+			"westeurope",    // West Europe
+			"southeastasia", // Southeast Asia
+			"eastasia",      // East Asia
+			"japaneast",     // Japan East
+			"australiaeast", // Australia East
+		}
 	default:
 		return []string{}
 	}
