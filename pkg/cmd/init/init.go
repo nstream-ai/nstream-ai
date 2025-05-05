@@ -6,6 +6,8 @@ import (
 	"os/exec"
 	"path/filepath"
 
+	"github.com/nstreama-ai/nstream-ai-cli/pkg/api"
+	"github.com/nstreama-ai/nstream-ai-cli/pkg/config"
 	"github.com/spf13/cobra"
 )
 
@@ -51,27 +53,12 @@ Examples:
   # Use existing cluster
   nsai init --cluster mycluster`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			configPath := filepath.Join(os.Getenv("HOME"), ".nstreamconfig")
-
-			// Check if config file exists
-			if _, err := os.Stat(configPath); os.IsNotExist(err) {
-				// No config file exists, use default workflow
-				fmt.Println("No configuration found. Starting with default workflow...")
-
-				// First ensure authentication is set up
-				if err := ensureAuthentication(); err != nil {
-					return err
-				}
-
-				// Then handle cluster operations
-				if err := handleClusterOperations(); err != nil {
-					return err
-				}
-
-				return nil
+			// First ensure authentication is set up
+			if err := ensureAuthentication(); err != nil {
+				return err
 			}
 
-			// Config file exists, handle cluster operations
+			// Then handle cluster operations
 			if err := handleClusterOperations(); err != nil {
 				return err
 			}
@@ -102,22 +89,52 @@ func ensureAuthentication() error {
 	}
 
 	// Read config file
-	config, err := readConfig(configPath)
+	cfg, err := config.LoadConfig()
 	if err != nil {
 		return fmt.Errorf("error reading config: %v", err)
 	}
 
-	// Check if auth token exists and is valid
-	token, exists := config["auth_token"]
-	if !exists || token == "" {
+	// Check if auth token exists
+	if cfg.User.AuthToken == "" {
 		fmt.Println("\nNo authentication token found. Authentication required.")
 		return promptForAuth()
 	}
 
-	// Check if token is expired
-	if isTokenExpired(token) {
-		fmt.Println("\nAuthentication token has expired. Re-authentication required.")
+	// Check if user exists
+	valid, err := api.MockValidateUser(cfg.User.Email)
+	if err != nil || !valid {
+		fmt.Println("\nUser validation failed. Authentication required.")
 		return promptForAuth()
+	}
+
+	// Check if token is valid
+	resp, err := api.MockValidateToken(cfg.User.AuthToken)
+	if err != nil {
+		return fmt.Errorf("error validating token: %v", err)
+	}
+
+	if !resp.Valid {
+		fmt.Printf("\nAuthentication token is invalid: %s\n", resp.Error)
+		fmt.Println("Authentication required.")
+		return promptForAuth()
+	}
+
+	// If cluster token exists, validate it too
+	if cfg.Cluster.ClusterToken != "" {
+		clusterResp, err := api.MockValidateClusterToken(cfg.Cluster.ClusterToken)
+		if err != nil {
+			return fmt.Errorf("error validating cluster token: %v", err)
+		}
+
+		if !clusterResp.Valid {
+			fmt.Printf("\nCluster token is invalid: %s\n", clusterResp.Error)
+			// Don't require re-authentication for invalid cluster token
+			// Just clear it from config
+			cfg.Cluster.ClusterToken = ""
+			if err := config.SaveConfig(cfg); err != nil {
+				return fmt.Errorf("error saving config: %v", err)
+			}
+		}
 	}
 
 	return nil
@@ -125,8 +142,8 @@ func ensureAuthentication() error {
 
 func promptForAuth() error {
 	fmt.Println("\nPlease choose an option:")
-	fmt.Println("1. Sign In (nsai auth signin)")
-	fmt.Println("2. Sign Up (nsai auth signup)")
+	fmt.Println("1. Sign In")
+	fmt.Println("2. Sign Up")
 	fmt.Print("\nEnter your choice (1 or 2): ")
 
 	var choice int
@@ -138,21 +155,9 @@ func promptForAuth() error {
 	case 2:
 		return runSignup()
 	default:
-		return fmt.Errorf("invalid choice")
+		fmt.Println("\nInvalid choice. Please try again.")
+		return promptForAuth()
 	}
-}
-
-func isTokenExpired(token string) bool {
-	// Execute auth check command
-	cmd := exec.Command(os.Args[0], "auth", "check")
-	cmd.Env = append(os.Environ(), fmt.Sprintf("NSTREAM_AUTH_TOKEN=%s", token))
-
-	// Run silently (don't show output)
-	cmd.Stdout = nil
-	cmd.Stderr = nil
-
-	err := cmd.Run()
-	return err != nil // If error, token is expired/invalid
 }
 
 func handleClusterOperations() error {
@@ -189,7 +194,13 @@ func runSignin() error {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	cmd.Stdin = os.Stdin
-	return cmd.Run()
+	err := cmd.Run()
+	if err != nil {
+		return err
+	}
+
+	// After successful signin, continue with cluster operations
+	return handleClusterOperations()
 }
 
 func runSignup() error {
@@ -198,7 +209,13 @@ func runSignup() error {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	cmd.Stdin = os.Stdin
-	return cmd.Run()
+	err := cmd.Run()
+	if err != nil {
+		return err
+	}
+
+	// After successful signup, continue with cluster operations
+	return handleClusterOperations()
 }
 
 func runCreateCluster() error {

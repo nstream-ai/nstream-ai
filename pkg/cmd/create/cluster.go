@@ -6,6 +6,7 @@ import (
 	"text/tabwriter"
 	"time"
 
+	"github.com/nstreama-ai/nstream-ai-cli/pkg/api"
 	"github.com/nstreama-ai/nstream-ai-cli/pkg/banner"
 	"github.com/nstreama-ai/nstream-ai-cli/pkg/config"
 	"github.com/spf13/cobra"
@@ -40,11 +41,9 @@ func createCluster(name string) error {
 
 	// Check if config exists
 	if !config.ConfigExists() {
-		fmt.Println("No configuration found. You need to authenticate first.")
-		fmt.Println("\nPlease choose one of the following options:")
-		fmt.Println("1. Sign in to an existing account: 'nsai auth signin'")
-		fmt.Println("2. Create a new account: 'nsai auth signup'")
-		fmt.Println("\nAfter authentication, run 'nsai create cluster " + name + "' again")
+		fmt.Println("No configuration found. Please authenticate first:")
+		fmt.Println("1. Sign in: 'nsai auth signin'")
+		fmt.Println("2. Sign up: 'nsai auth signup'")
 		return fmt.Errorf("authentication required")
 	}
 
@@ -56,17 +55,32 @@ func createCluster(name string) error {
 
 	// Check if user is authenticated
 	if cfg.User.AuthToken == "" {
-		fmt.Println("No authentication token found. You need to sign in first.")
-		fmt.Println("\nRun 'nsai auth signin' to authenticate")
-		fmt.Println("After authentication, run 'nsai create cluster " + name + "' again")
+		fmt.Println("No authentication token found. Please authenticate first:")
+		fmt.Println("1. Sign in: 'nsai auth signin'")
+		fmt.Println("2. Sign up: 'nsai auth signup'")
 		return fmt.Errorf("authentication required")
 	}
 
 	// Check if user exists
-	if cfg.User.Email == "" {
-		fmt.Println("No user found. You need to sign in first.")
-		fmt.Println("\nRun 'nsai auth signin' to authenticate")
-		fmt.Println("After authentication, run 'nsai create cluster " + name + "' again")
+	valid, err := api.MockValidateUser(cfg.User.Email)
+	if err != nil || !valid {
+		fmt.Println("User validation failed. Please authenticate first:")
+		fmt.Println("1. Sign in: 'nsai auth signin'")
+		fmt.Println("2. Sign up: 'nsai auth signup'")
+		return fmt.Errorf("authentication required")
+	}
+
+	// Check if token is valid
+	resp, err := api.MockValidateToken(cfg.User.AuthToken)
+	if err != nil {
+		return fmt.Errorf("error validating token: %v", err)
+	}
+
+	if !resp.Valid {
+		fmt.Printf("Authentication token is invalid: %s\n", resp.Error)
+		fmt.Println("\nPlease authenticate first:")
+		fmt.Println("1. Sign in: 'nsai auth signin'")
+		fmt.Println("2. Sign up: 'nsai auth signup'")
 		return fmt.Errorf("authentication required")
 	}
 
