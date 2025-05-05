@@ -3,14 +3,13 @@ package init
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 
 	"github.com/spf13/cobra"
 )
 
 var (
-	username      string
-	password      string
 	clusterName   string
 	createCluster bool
 	region        string
@@ -24,19 +23,17 @@ func NewInitCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "init",
 		Short: "Initialize the NStream AI CLI configuration",
-		Long: `Initialize the NStream AI CLI by setting up your user configuration and cluster settings.
+		Long: `Initialize the NStream AI CLI by setting up your configuration.
 
 This command supports both interactive and non-interactive workflows:
 
 Interactive Workflow:
 - If no flags are provided, you'll be guided through:
-  1. Sign in or Sign up process
-  2. Cluster selection (create new or use existing)
+  1. Authentication (using auth commands)
+  2. Cluster setup (using create/use commands)
 
 Non-interactive Workflow:
 - Use flags to specify your configuration:
-  --user, -u: Username for authentication
-  --password, -p: Password for authentication
   --cluster, -c: Cluster name to use
   --create-cluster: Create a new cluster (requires --region, --cloud, --bucket, and --role)
   --region: Region for cluster creation
@@ -47,9 +44,6 @@ Non-interactive Workflow:
 Examples:
   # Interactive setup
   nsai init
-
-  # Sign in with username and password
-  nsai init --user myuser --password mypass
 
   # Create a new cluster
   nsai init --create-cluster --region us-west-2 --cloud aws --bucket mybucket --role myrole
@@ -64,34 +58,21 @@ Examples:
 				// No config file exists, use default workflow
 				fmt.Println("No configuration found. Starting with default workflow...")
 
-				// Handle authentication first
-				if err := handleAuthentication(configPath); err != nil {
+				// First ensure authentication is set up
+				if err := ensureAuthentication(); err != nil {
 					return err
 				}
 
 				// Then handle cluster operations
-				if err := handleClusterOperations(configPath); err != nil {
+				if err := handleClusterOperations(); err != nil {
 					return err
 				}
 
 				return nil
 			}
 
-			// Config file exists, read it
-			config, err := readConfig(configPath)
-			if err != nil {
-				return fmt.Errorf("error reading config: %v", err)
-			}
-
-			// If no auth token exists or user flag is provided, handle authentication
-			if config["auth_token"] == "" || username != "" {
-				if err := handleAuthentication(configPath); err != nil {
-					return err
-				}
-			}
-
-			// Handle cluster operations
-			if err := handleClusterOperations(configPath); err != nil {
+			// Config file exists, handle cluster operations
+			if err := handleClusterOperations(); err != nil {
 				return err
 			}
 
@@ -100,8 +81,6 @@ Examples:
 	}
 
 	// Add flags
-	cmd.Flags().StringVarP(&username, "user", "u", "", "Username for authentication")
-	cmd.Flags().StringVarP(&password, "password", "p", "", "Password for authentication")
 	cmd.Flags().StringVarP(&clusterName, "cluster", "c", "", "Cluster name to use")
 	cmd.Flags().BoolVar(&createCluster, "create-cluster", false, "Create a new cluster")
 	cmd.Flags().StringVar(&region, "region", "", "Region for cluster creation")
@@ -112,49 +91,42 @@ Examples:
 	return cmd
 }
 
-func handleAuthentication(configPath string) error {
-	// If username and password are provided, proceed with signin
-	if username != "" && password != "" {
-		authToken, err := authenticateWithGRPC(username, password)
-		if err != nil {
-			return fmt.Errorf("authentication failed: %v", err)
-		}
+func ensureAuthentication() error {
+	// Check if user is authenticated
+	configPath := filepath.Join(os.Getenv("HOME"), ".nstreamconfig")
 
-		// Update config with auth token
-		if err := updateConfig(configPath, map[string]string{
-			"username":   username,
-			"auth_token": authToken,
-		}); err != nil {
-			return fmt.Errorf("error updating config: %v", err)
-		}
-		return nil
+	// Check if config file exists
+	if _, err := os.Stat(configPath); os.IsNotExist(err) {
+		fmt.Println("\nNo configuration file found. Authentication required.")
+		return promptForAuth()
 	}
 
-	// If only username is provided, ask for password
-	if username != "" {
-		fmt.Print("Enter password: ")
-		fmt.Scanf("%s", &password)
-
-		authToken, err := authenticateWithGRPC(username, password)
-		if err != nil {
-			return fmt.Errorf("authentication failed: %v", err)
-		}
-
-		// Update config with auth token
-		if err := updateConfig(configPath, map[string]string{
-			"username":   username,
-			"auth_token": authToken,
-		}); err != nil {
-			return fmt.Errorf("error updating config: %v", err)
-		}
-		return nil
+	// Read config file
+	config, err := readConfig(configPath)
+	if err != nil {
+		return fmt.Errorf("error reading config: %v", err)
 	}
 
-	// No credentials provided, ask user what they want to do
-	fmt.Println("\nWelcome to NStream AI CLI!")
-	fmt.Println("Please choose an option:")
-	fmt.Println("1. Sign In")
-	fmt.Println("2. Sign Up")
+	// Check if auth token exists and is valid
+	token, exists := config["auth_token"]
+	if !exists || token == "" {
+		fmt.Println("\nNo authentication token found. Authentication required.")
+		return promptForAuth()
+	}
+
+	// Check if token is expired
+	if isTokenExpired(token) {
+		fmt.Println("\nAuthentication token has expired. Re-authentication required.")
+		return promptForAuth()
+	}
+
+	return nil
+}
+
+func promptForAuth() error {
+	fmt.Println("\nPlease choose an option:")
+	fmt.Println("1. Sign In (nsai auth signin)")
+	fmt.Println("2. Sign Up (nsai auth signup)")
 	fmt.Print("\nEnter your choice (1 or 2): ")
 
 	var choice int
@@ -162,80 +134,39 @@ func handleAuthentication(configPath string) error {
 
 	switch choice {
 	case 1:
-		return handleSignIn(configPath)
+		return runSignin()
 	case 2:
-		return handleSignUp(configPath)
+		return runSignup()
 	default:
 		return fmt.Errorf("invalid choice")
 	}
 }
 
-func handleSignIn(configPath string) error {
-	fmt.Print("Enter username: ")
-	fmt.Scanf("%s", &username)
+func isTokenExpired(token string) bool {
+	// Execute auth check command
+	cmd := exec.Command(os.Args[0], "auth", "check")
+	cmd.Env = append(os.Environ(), fmt.Sprintf("NSTREAM_AUTH_TOKEN=%s", token))
 
-	fmt.Print("Enter password: ")
-	fmt.Scanf("%s", &password)
+	// Run silently (don't show output)
+	cmd.Stdout = nil
+	cmd.Stderr = nil
 
-	authToken, err := authenticateWithGRPC(username, password)
-	if err != nil {
-		return fmt.Errorf("authentication failed: %v", err)
-	}
-
-	// Update config with auth token
-	if err := updateConfig(configPath, map[string]string{
-		"username":   username,
-		"auth_token": authToken,
-	}); err != nil {
-		return fmt.Errorf("error updating config: %v", err)
-	}
-
-	return nil
+	err := cmd.Run()
+	return err != nil // If error, token is expired/invalid
 }
 
-func handleSignUp(configPath string) error {
-	var email, orgName, role string
-
-	fmt.Print("Enter email: ")
-	fmt.Scanf("%s", &email)
-
-	fmt.Print("Enter organization name: ")
-	fmt.Scanf("%s", &orgName)
-
-	fmt.Print("Enter role: ")
-	fmt.Scanf("%s", &role)
-
-	// TODO: Implement signup via gRPC
-	// After successful signup, proceed with signin
-	return handleSignIn(configPath)
-}
-
-func handleClusterOperations(configPath string) error {
-	// If create-cluster flag is set, all required flags must be provided
+func handleClusterOperations() error {
 	if createCluster {
-		if region == "" || cloud == "" || bucket == "" || role == "" {
-			return fmt.Errorf("when --create-cluster is set, all of --region, --cloud, --bucket, and --role are required")
-		}
-
-		createdClusterName, err := createNewCluster(region, cloud, bucket, role)
-		if err != nil {
-			return fmt.Errorf("error creating cluster: %v", err)
-		}
-		clusterName = createdClusterName
+		// Use create cluster command
+		return runCreateCluster()
 	} else if clusterName != "" {
-		// If cluster name is provided (but not creating), verify it exists
-		exists, err := verifyClusterExists(clusterName)
-		if err != nil {
-			return fmt.Errorf("error verifying cluster: %v", err)
-		}
-		if !exists {
-			return fmt.Errorf("cluster %s does not exist", clusterName)
-		}
+		// Use existing cluster
+		return runUseCluster(clusterName)
 	} else {
-		// Interactive cluster selection
-		fmt.Println("\nCluster Setup")
-		fmt.Println("1. Create new cluster")
-		fmt.Println("2. Use existing cluster")
+		// Interactive mode
+		fmt.Println("\nPlease choose an option:")
+		fmt.Println("1. Create new cluster (nsai create cluster)")
+		fmt.Println("2. Use existing cluster (nsai use cluster)")
 		fmt.Print("\nEnter your choice (1 or 2): ")
 
 		var choice int
@@ -243,91 +174,87 @@ func handleClusterOperations(configPath string) error {
 
 		switch choice {
 		case 1:
-			// Get cluster creation prerequisites
-			fmt.Print("Enter region: ")
-			fmt.Scanf("%s", &region)
-
-			fmt.Print("Enter cloud provider: ")
-			fmt.Scanf("%s", &cloud)
-
-			fmt.Print("Enter bucket name: ")
-			fmt.Scanf("%s", &bucket)
-
-			fmt.Print("Enter role: ")
-			fmt.Scanf("%s", &role)
-
-			createdClusterName, err := createNewCluster(region, cloud, bucket, role)
-			if err != nil {
-				return fmt.Errorf("error creating cluster: %v", err)
-			}
-			clusterName = createdClusterName
+			return runCreateCluster()
 		case 2:
-			// List available clusters and let user choose
-			clusters, err := listClusters()
-			if err != nil {
-				return fmt.Errorf("error listing clusters: %v", err)
-			}
-
-			if len(clusters) == 0 {
-				return fmt.Errorf("no clusters available")
-			}
-
-			fmt.Println("\nAvailable clusters:")
-			for i, cluster := range clusters {
-				fmt.Printf("%d. %s\n", i+1, cluster)
-			}
-
-			fmt.Print("\nEnter the number of the cluster to use: ")
-			var choice int
-			fmt.Scanf("%d", &choice)
-
-			if choice < 1 || choice > len(clusters) {
-				return fmt.Errorf("invalid cluster choice")
-			}
-
-			clusterName = clusters[choice-1]
+			return runUseCluster("")
 		default:
 			return fmt.Errorf("invalid choice")
 		}
 	}
-
-	// Update config with cluster information
-	if err := updateConfig(configPath, map[string]string{
-		"cluster": clusterName,
-	}); err != nil {
-		return fmt.Errorf("error updating config: %v", err)
-	}
-
-	return nil
 }
 
-// Helper functions
-func listClusters() ([]string, error) {
-	// TODO: Implement cluster listing via gRPC
-	return []string{"cluster1", "cluster2"}, nil
+func runSignin() error {
+	// Execute signin command
+	cmd := exec.Command(os.Args[0], "auth", "signin")
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	cmd.Stdin = os.Stdin
+	return cmd.Run()
+}
+
+func runSignup() error {
+	// Execute signup command
+	cmd := exec.Command(os.Args[0], "auth", "signup")
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	cmd.Stdin = os.Stdin
+	return cmd.Run()
+}
+
+func runCreateCluster() error {
+	// Execute create cluster command with appropriate flags
+	args := []string{"create", "cluster"}
+
+	// Prompt for cluster name if not provided
+	var clusterName string
+	fmt.Print("\nEnter cluster name: ")
+	fmt.Scanf("%s", &clusterName)
+	args = append(args, clusterName)
+
+	if region != "" {
+		args = append(args, "--region", region)
+	}
+	if cloud != "" {
+		args = append(args, "--cloud", cloud)
+	}
+	if bucket != "" {
+		args = append(args, "--bucket", bucket)
+	}
+	if role != "" {
+		args = append(args, "--role", role)
+	}
+
+	cmd := exec.Command(os.Args[0], args...)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	cmd.Stdin = os.Stdin
+	return cmd.Run()
+}
+
+func runUseCluster(name string) error {
+	// Execute use cluster command
+	args := []string{"use", "cluster"}
+	if name != "" {
+		args = append(args, name)
+	}
+
+	cmd := exec.Command(os.Args[0], args...)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	cmd.Stdin = os.Stdin
+	return cmd.Run()
 }
 
 func readConfig(configPath string) (map[string]string, error) {
-	// TODO: Implement config reading
-	return make(map[string]string), nil
-}
+	// Read and parse config file
+	config := make(map[string]string)
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		return nil, err
+	}
 
-func authenticateWithGRPC(username, password string) (string, error) {
-	// TODO: Implement authentication via gRPC
-	return "dummy-token", nil
-}
-
-func verifyClusterExists(clusterName string) (bool, error) {
-	// TODO: Implement cluster verification via gRPC
-	return true, nil
-}
-
-func createNewCluster(region, cloud, bucket, role string) (string, error) {
-	// TODO: Implement cluster creation via gRPC
-	return "new-cluster", nil
-}
-
-func updateConfig(configPath string, updates map[string]string) error {
-	// TODO: Implement config updating
-	return nil
+	// Parse config file (implement your config parsing logic here)
+	// This is a placeholder - implement actual config parsing
+	_ = data // TODO: Parse data into config map
+	return config, nil
 }
