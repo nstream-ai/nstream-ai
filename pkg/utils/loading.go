@@ -60,10 +60,12 @@ func ShowLoading(config LoadingConfig, done chan bool) {
 			dynamicMessage := fmt.Sprintf("%s%s%s%s", config.Colors[j], boldColor, config.Message, resetColor)
 
 			extra := ""
-			for k, timing := range config.EmojiTiming {
-				if elapsed < timing {
-					extra = config.Emoji[k]
-					break
+			if len(config.EmojiTiming) > 0 && len(config.Emoji) > 0 {
+				for k, timing := range config.EmojiTiming {
+					if k < len(config.Emoji) && elapsed < timing {
+						extra = config.Emoji[k]
+						break
+					}
 				}
 			}
 
