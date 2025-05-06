@@ -96,6 +96,7 @@ that are compatible with your cluster's cloud provider.`,
 				// Get cluster details
 				detailsResp, err := c.ClusterClient.GetClusterDetails(ctx, &clusterproto.GetClusterDetailsRequest{
 					ClusterName: cfg.Cluster.Name,
+					AuthToken:   cfg.User.AuthToken,
 				})
 				if err != nil {
 					done <- true
@@ -141,6 +142,7 @@ that are compatible with your cluster's cloud provider.`,
 			// List buckets
 			bucketsResp, err := c.BucketClient.ListBuckets(ctx, &clusterproto.ListBucketsRequest{
 				CloudProvider: clusterCloudProvider,
+				AuthToken:     cfg.User.AuthToken,
 			})
 			if err != nil {
 				done <- true

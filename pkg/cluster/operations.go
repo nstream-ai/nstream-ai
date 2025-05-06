@@ -38,7 +38,9 @@ func NewOperations() (*Operations, error) {
 
 // ListClusters lists all available clusters
 func (o *Operations) ListClusters(ctx context.Context) ([]*clusterproto.Cluster, error) {
-	listResp, err := o.client.ClusterClient.ListClusters(ctx, &clusterproto.ListClustersRequest{})
+	listResp, err := o.client.ClusterClient.ListClusters(ctx, &clusterproto.ListClustersRequest{
+		AuthToken: o.config.User.AuthToken,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to list clusters: %v", err)
 	}
@@ -50,6 +52,7 @@ func (o *Operations) ListClusters(ctx context.Context) ([]*clusterproto.Cluster,
 func (o *Operations) GetClusterDetails(ctx context.Context, clusterName string) (*clusterproto.ClusterConfig, error) {
 	detailsResp, err := o.client.ClusterClient.GetClusterDetails(ctx, &clusterproto.GetClusterDetailsRequest{
 		ClusterName: clusterName,
+		AuthToken:   o.config.User.AuthToken,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to get cluster details: %v", err)

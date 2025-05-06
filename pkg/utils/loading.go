@@ -61,7 +61,7 @@ func ShowLoading(config LoadingConfig, done chan bool) {
 
 			extra := ""
 			for k, timing := range config.EmojiTiming {
-				if elapsed < timing {
+				if elapsed < timing && k < len(config.Emoji) {
 					extra = config.Emoji[k]
 					break
 				}

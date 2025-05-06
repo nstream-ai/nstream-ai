@@ -927,7 +927,7 @@ const file_proto_auth_proto_rawDesc = "" +
 	"\fVerifySignUp\x12\x19.auth.VerifySignUpRequest\x1a\x1a.auth.VerifySignUpResponse\"\x00\x12G\n" +
 	"\fValidateUser\x12\x19.auth.ValidateUserRequest\x1a\x1a.auth.ValidateUserResponse\"\x00\x12J\n" +
 	"\rValidateToken\x12\x1a.auth.ValidateTokenRequest\x1a\x1b.auth.ValidateTokenResponse\"\x00\x12_\n" +
-	"\x14ValidateClusterToken\x12!.auth.ValidateClusterTokenRequest\x1a\".auth.ValidateClusterTokenResponse\"\x00B-Z+github.com/nstream-ai/mothership/proto/authb\x06proto3"
+	"\x14ValidateClusterToken\x12!.auth.ValidateClusterTokenRequest\x1a\".auth.ValidateClusterTokenResponse\"\x00B8Z6github.com/nstream-ai/nstream-ai-mothership/proto/authb\x06proto3"
 
 var (
 	file_proto_auth_proto_rawDescOnce sync.Once

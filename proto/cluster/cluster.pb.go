@@ -25,6 +25,7 @@ const (
 // Cluster messages
 type ListClustersRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
+	AuthToken     string                 `protobuf:"bytes,1,opt,name=auth_token,json=authToken,proto3" json:"auth_token,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -57,6 +58,13 @@ func (x *ListClustersRequest) ProtoReflect() protoreflect.Message {
 // Deprecated: Use ListClustersRequest.ProtoReflect.Descriptor instead.
 func (*ListClustersRequest) Descriptor() ([]byte, []int) {
 	return file_proto_cluster_proto_rawDescGZIP(), []int{0}
+}
+
+func (x *ListClustersRequest) GetAuthToken() string {
+	if x != nil {
+		return x.AuthToken
+	}
+	return ""
 }
 
 type ListClustersResponse struct {
@@ -182,6 +190,7 @@ func (x *Cluster) GetRole() string {
 type VerifyClusterExistsRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	ClusterName   string                 `protobuf:"bytes,1,opt,name=cluster_name,json=clusterName,proto3" json:"cluster_name,omitempty"`
+	AuthToken     string                 `protobuf:"bytes,2,opt,name=auth_token,json=authToken,proto3" json:"auth_token,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -219,6 +228,13 @@ func (*VerifyClusterExistsRequest) Descriptor() ([]byte, []int) {
 func (x *VerifyClusterExistsRequest) GetClusterName() string {
 	if x != nil {
 		return x.ClusterName
+	}
+	return ""
+}
+
+func (x *VerifyClusterExistsRequest) GetAuthToken() string {
+	if x != nil {
+		return x.AuthToken
 	}
 	return ""
 }
@@ -278,6 +294,7 @@ func (x *VerifyClusterExistsResponse) GetError() string {
 type GetClusterDetailsRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	ClusterName   string                 `protobuf:"bytes,1,opt,name=cluster_name,json=clusterName,proto3" json:"cluster_name,omitempty"`
+	AuthToken     string                 `protobuf:"bytes,2,opt,name=auth_token,json=authToken,proto3" json:"auth_token,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -315,6 +332,13 @@ func (*GetClusterDetailsRequest) Descriptor() ([]byte, []int) {
 func (x *GetClusterDetailsRequest) GetClusterName() string {
 	if x != nil {
 		return x.ClusterName
+	}
+	return ""
+}
+
+func (x *GetClusterDetailsRequest) GetAuthToken() string {
+	if x != nil {
+		return x.AuthToken
 	}
 	return ""
 }
@@ -463,6 +487,7 @@ type CreateClusterRequest struct {
 	Region        string                 `protobuf:"bytes,4,opt,name=region,proto3" json:"region,omitempty"`
 	Bucket        string                 `protobuf:"bytes,5,opt,name=bucket,proto3" json:"bucket,omitempty"`
 	Role          string                 `protobuf:"bytes,6,opt,name=role,proto3" json:"role,omitempty"`
+	AuthToken     string                 `protobuf:"bytes,7,opt,name=auth_token,json=authToken,proto3" json:"auth_token,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -539,6 +564,13 @@ func (x *CreateClusterRequest) GetRole() string {
 	return ""
 }
 
+func (x *CreateClusterRequest) GetAuthToken() string {
+	if x != nil {
+		return x.AuthToken
+	}
+	return ""
+}
+
 type CreateClusterResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Config        *ClusterConfig         `protobuf:"bytes,1,opt,name=config,proto3" json:"config,omitempty"`
@@ -595,6 +627,7 @@ func (x *CreateClusterResponse) GetError() string {
 type ListBucketsRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	CloudProvider string                 `protobuf:"bytes,1,opt,name=cloud_provider,json=cloudProvider,proto3" json:"cloud_provider,omitempty"`
+	AuthToken     string                 `protobuf:"bytes,2,opt,name=auth_token,json=authToken,proto3" json:"auth_token,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -632,6 +665,13 @@ func (*ListBucketsRequest) Descriptor() ([]byte, []int) {
 func (x *ListBucketsRequest) GetCloudProvider() string {
 	if x != nil {
 		return x.CloudProvider
+	}
+	return ""
+}
+
+func (x *ListBucketsRequest) GetAuthToken() string {
+	if x != nil {
+		return x.AuthToken
 	}
 	return ""
 }
@@ -761,6 +801,7 @@ type VerifyBucketAccessRequest struct {
 	CloudProvider string                 `protobuf:"bytes,1,opt,name=cloud_provider,json=cloudProvider,proto3" json:"cloud_provider,omitempty"`
 	Bucket        string                 `protobuf:"bytes,2,opt,name=bucket,proto3" json:"bucket,omitempty"`
 	Role          string                 `protobuf:"bytes,3,opt,name=role,proto3" json:"role,omitempty"`
+	AuthToken     string                 `protobuf:"bytes,4,opt,name=auth_token,json=authToken,proto3" json:"auth_token,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -812,6 +853,13 @@ func (x *VerifyBucketAccessRequest) GetBucket() string {
 func (x *VerifyBucketAccessRequest) GetRole() string {
 	if x != nil {
 		return x.Role
+	}
+	return ""
+}
+
+func (x *VerifyBucketAccessRequest) GetAuthToken() string {
+	if x != nil {
+		return x.AuthToken
 	}
 	return ""
 }
@@ -873,6 +921,7 @@ type CheckResourceReadinessRequest struct {
 	CloudProvider string                 `protobuf:"bytes,1,opt,name=cloud_provider,json=cloudProvider,proto3" json:"cloud_provider,omitempty"`
 	Bucket        string                 `protobuf:"bytes,2,opt,name=bucket,proto3" json:"bucket,omitempty"`
 	Role          string                 `protobuf:"bytes,3,opt,name=role,proto3" json:"role,omitempty"`
+	AuthToken     string                 `protobuf:"bytes,4,opt,name=auth_token,json=authToken,proto3" json:"auth_token,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -924,6 +973,13 @@ func (x *CheckResourceReadinessRequest) GetBucket() string {
 func (x *CheckResourceReadinessRequest) GetRole() string {
 	if x != nil {
 		return x.Role
+	}
+	return ""
+}
+
+func (x *CheckResourceReadinessRequest) GetAuthToken() string {
+	if x != nil {
+		return x.AuthToken
 	}
 	return ""
 }
@@ -984,8 +1040,10 @@ var File_proto_cluster_proto protoreflect.FileDescriptor
 
 const file_proto_cluster_proto_rawDesc = "" +
 	"\n" +
-	"\x13proto/cluster.proto\x12\acluster\x1a\x1fgoogle/protobuf/timestamp.proto\"\x15\n" +
-	"\x13ListClustersRequest\"D\n" +
+	"\x13proto/cluster.proto\x12\acluster\x1a\x1fgoogle/protobuf/timestamp.proto\"4\n" +
+	"\x13ListClustersRequest\x12\x1d\n" +
+	"\n" +
+	"auth_token\x18\x01 \x01(\tR\tauthToken\"D\n" +
 	"\x14ListClustersResponse\x12,\n" +
 	"\bclusters\x18\x01 \x03(\v2\x10.cluster.ClusterR\bclusters\"\x84\x01\n" +
 	"\aCluster\x12\x0e\n" +
@@ -993,14 +1051,18 @@ const file_proto_cluster_proto_rawDesc = "" +
 	"\x06region\x18\x02 \x01(\tR\x06region\x12%\n" +
 	"\x0ecloud_provider\x18\x03 \x01(\tR\rcloudProvider\x12\x16\n" +
 	"\x06bucket\x18\x04 \x01(\tR\x06bucket\x12\x12\n" +
-	"\x04role\x18\x05 \x01(\tR\x04role\"?\n" +
+	"\x04role\x18\x05 \x01(\tR\x04role\"^\n" +
 	"\x1aVerifyClusterExistsRequest\x12!\n" +
-	"\fcluster_name\x18\x01 \x01(\tR\vclusterName\"K\n" +
+	"\fcluster_name\x18\x01 \x01(\tR\vclusterName\x12\x1d\n" +
+	"\n" +
+	"auth_token\x18\x02 \x01(\tR\tauthToken\"K\n" +
 	"\x1bVerifyClusterExistsResponse\x12\x16\n" +
 	"\x06exists\x18\x01 \x01(\bR\x06exists\x12\x14\n" +
-	"\x05error\x18\x02 \x01(\tR\x05error\"=\n" +
+	"\x05error\x18\x02 \x01(\tR\x05error\"\\\n" +
 	"\x18GetClusterDetailsRequest\x12!\n" +
-	"\fcluster_name\x18\x01 \x01(\tR\vclusterName\"a\n" +
+	"\fcluster_name\x18\x01 \x01(\tR\vclusterName\x12\x1d\n" +
+	"\n" +
+	"auth_token\x18\x02 \x01(\tR\tauthToken\"a\n" +
 	"\x19GetClusterDetailsResponse\x12.\n" +
 	"\x06config\x18\x01 \x01(\v2\x16.cluster.ClusterConfigR\x06config\x12\x14\n" +
 	"\x05error\x18\x02 \x01(\tR\x05error\"\xb3\x01\n" +
@@ -1010,19 +1072,23 @@ const file_proto_cluster_proto_rawDesc = "" +
 	"\x0ecloud_provider\x18\x03 \x01(\tR\rcloudProvider\x12\x16\n" +
 	"\x06bucket\x18\x04 \x01(\tR\x06bucket\x12\x12\n" +
 	"\x04role\x18\x05 \x01(\tR\x04role\x12#\n" +
-	"\rcluster_token\x18\x06 \x01(\tR\fclusterToken\"\xa9\x01\n" +
+	"\rcluster_token\x18\x06 \x01(\tR\fclusterToken\"\xc8\x01\n" +
 	"\x14CreateClusterRequest\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x12\n" +
 	"\x04type\x18\x02 \x01(\tR\x04type\x12%\n" +
 	"\x0ecloud_provider\x18\x03 \x01(\tR\rcloudProvider\x12\x16\n" +
 	"\x06region\x18\x04 \x01(\tR\x06region\x12\x16\n" +
 	"\x06bucket\x18\x05 \x01(\tR\x06bucket\x12\x12\n" +
-	"\x04role\x18\x06 \x01(\tR\x04role\"]\n" +
+	"\x04role\x18\x06 \x01(\tR\x04role\x12\x1d\n" +
+	"\n" +
+	"auth_token\x18\a \x01(\tR\tauthToken\"]\n" +
 	"\x15CreateClusterResponse\x12.\n" +
 	"\x06config\x18\x01 \x01(\v2\x16.cluster.ClusterConfigR\x06config\x12\x14\n" +
-	"\x05error\x18\x02 \x01(\tR\x05error\";\n" +
+	"\x05error\x18\x02 \x01(\tR\x05error\"Z\n" +
 	"\x12ListBucketsRequest\x12%\n" +
-	"\x0ecloud_provider\x18\x01 \x01(\tR\rcloudProvider\"@\n" +
+	"\x0ecloud_provider\x18\x01 \x01(\tR\rcloudProvider\x12\x1d\n" +
+	"\n" +
+	"auth_token\x18\x02 \x01(\tR\tauthToken\"@\n" +
 	"\x13ListBucketsResponse\x12)\n" +
 	"\abuckets\x18\x01 \x03(\v2\x0f.cluster.BucketR\abuckets\"\x9f\x01\n" +
 	"\x06Bucket\x12\x12\n" +
@@ -1031,19 +1097,23 @@ const file_proto_cluster_proto_rawDesc = "" +
 	"\bprovider\x18\x03 \x01(\tR\bprovider\x12\x12\n" +
 	"\x04size\x18\x04 \x01(\tR\x04size\x129\n" +
 	"\n" +
-	"created_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\"n\n" +
+	"created_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\"\x8d\x01\n" +
 	"\x19VerifyBucketAccessRequest\x12%\n" +
 	"\x0ecloud_provider\x18\x01 \x01(\tR\rcloudProvider\x12\x16\n" +
 	"\x06bucket\x18\x02 \x01(\tR\x06bucket\x12\x12\n" +
-	"\x04role\x18\x03 \x01(\tR\x04role\"Q\n" +
+	"\x04role\x18\x03 \x01(\tR\x04role\x12\x1d\n" +
+	"\n" +
+	"auth_token\x18\x04 \x01(\tR\tauthToken\"Q\n" +
 	"\x1aVerifyBucketAccessResponse\x12\x1d\n" +
 	"\n" +
 	"has_access\x18\x01 \x01(\bR\thasAccess\x12\x14\n" +
-	"\x05error\x18\x02 \x01(\tR\x05error\"r\n" +
+	"\x05error\x18\x02 \x01(\tR\x05error\"\x91\x01\n" +
 	"\x1dCheckResourceReadinessRequest\x12%\n" +
 	"\x0ecloud_provider\x18\x01 \x01(\tR\rcloudProvider\x12\x16\n" +
 	"\x06bucket\x18\x02 \x01(\tR\x06bucket\x12\x12\n" +
-	"\x04role\x18\x03 \x01(\tR\x04role\"L\n" +
+	"\x04role\x18\x03 \x01(\tR\x04role\x12\x1d\n" +
+	"\n" +
+	"auth_token\x18\x04 \x01(\tR\tauthToken\"L\n" +
 	"\x1eCheckResourceReadinessResponse\x12\x14\n" +
 	"\x05ready\x18\x01 \x01(\bR\x05ready\x12\x14\n" +
 	"\x05error\x18\x02 \x01(\tR\x05error2\xf3\x02\n" +
@@ -1055,7 +1125,7 @@ const file_proto_cluster_proto_rawDesc = "" +
 	"\rBucketService\x12J\n" +
 	"\vListBuckets\x12\x1b.cluster.ListBucketsRequest\x1a\x1c.cluster.ListBucketsResponse\"\x00\x12_\n" +
 	"\x12VerifyBucketAccess\x12\".cluster.VerifyBucketAccessRequest\x1a#.cluster.VerifyBucketAccessResponse\"\x00\x12k\n" +
-	"\x16CheckResourceReadiness\x12&.cluster.CheckResourceReadinessRequest\x1a'.cluster.CheckResourceReadinessResponse\"\x00B0Z.github.com/nstream-ai/mothership/proto/clusterb\x06proto3"
+	"\x16CheckResourceReadiness\x12&.cluster.CheckResourceReadinessRequest\x1a'.cluster.CheckResourceReadinessResponse\"\x00B;Z9github.com/nstream-ai/nstream-ai-mothership/proto/clusterb\x06proto3"
 
 var (
 	file_proto_cluster_proto_rawDescOnce sync.Once

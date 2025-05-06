@@ -115,10 +115,12 @@ You must have a cluster context set or provide a cluster name to use this comman
 			} else if cfg.Cluster.Name != "" {
 				// Create a channel for loading animation
 				done := make(chan bool)
-				go utils.ShowLoading(utils.LoadingConfig{Message: "Fetching available clusters"}, done)
+				go utils.ShowDefaultLoading("Fetching available clusters", done)
 
 				// List clusters
-				listResp, err := c.ClusterClient.ListClusters(ctx, &clusterproto.ListClustersRequest{})
+				listResp, err := c.ClusterClient.ListClusters(ctx, &clusterproto.ListClustersRequest{
+					AuthToken: cfg.User.AuthToken,
+				})
 				if err != nil {
 					done <- true
 					return fmt.Errorf("failed to get clusters: %v", err)
@@ -166,10 +168,12 @@ You must have a cluster context set or provide a cluster name to use this comman
 			} else {
 				// Create a channel for loading animation
 				done := make(chan bool)
-				go utils.ShowLoading(utils.LoadingConfig{Message: "Fetching available clusters"}, done)
+				go utils.ShowDefaultLoading("Fetching available clusters", done)
 
 				// List clusters
-				listResp, err := c.ClusterClient.ListClusters(ctx, &clusterproto.ListClustersRequest{})
+				listResp, err := c.ClusterClient.ListClusters(ctx, &clusterproto.ListClustersRequest{
+					AuthToken: cfg.User.AuthToken,
+				})
 				if err != nil {
 					done <- true
 					return fmt.Errorf("failed to get clusters: %v", err)
@@ -222,11 +226,12 @@ You must have a cluster context set or provide a cluster name to use this comman
 			if bucketName == "" {
 				// Create a channel for loading animation
 				done := make(chan bool)
-				go utils.ShowLoading(utils.LoadingConfig{Message: "Fetching available buckets"}, done)
+				go utils.ShowDefaultLoading("Fetching available buckets", done)
 
 				// Get cluster details to check cloud provider
 				detailsResp, err := c.ClusterClient.GetClusterDetails(ctx, &clusterproto.GetClusterDetailsRequest{
 					ClusterName: clusterName,
+					AuthToken:   cfg.User.AuthToken,
 				})
 				if err != nil {
 					done <- true
@@ -241,6 +246,7 @@ You must have a cluster context set or provide a cluster name to use this comman
 				// List buckets
 				bucketsResp, err := c.BucketClient.ListBuckets(ctx, &clusterproto.ListBucketsRequest{
 					CloudProvider: detailsResp.Config.CloudProvider,
+					AuthToken:     cfg.User.AuthToken,
 				})
 				if err != nil {
 					done <- true
@@ -294,12 +300,13 @@ You must have a cluster context set or provide a cluster name to use this comman
 
 			// Verify bucket access
 			done := make(chan bool)
-			go utils.ShowLoading(utils.LoadingConfig{Message: "Verifying bucket access"}, done)
+			go utils.ShowDefaultLoading("Verifying bucket access", done)
 
 			accessResp, err := c.BucketClient.VerifyBucketAccess(ctx, &clusterproto.VerifyBucketAccessRequest{
 				CloudProvider: cfg.Cluster.CloudProvider,
 				Bucket:        bucketName,
 				Role:          cfg.Cluster.Role,
+				AuthToken:     cfg.User.AuthToken,
 			})
 			if err != nil {
 				done <- true
@@ -315,12 +322,13 @@ You must have a cluster context set or provide a cluster name to use this comman
 
 			// Check resource readiness
 			done = make(chan bool)
-			go utils.ShowLoading(utils.LoadingConfig{Message: "Checking resource readiness"}, done)
+			go utils.ShowDefaultLoading("Checking resource readiness", done)
 
 			readyResp, err := c.BucketClient.CheckResourceReadiness(ctx, &clusterproto.CheckResourceReadinessRequest{
 				CloudProvider: cfg.Cluster.CloudProvider,
 				Bucket:        bucketName,
 				Role:          cfg.Cluster.Role,
+				AuthToken:     cfg.User.AuthToken,
 			})
 			if err != nil {
 				done <- true

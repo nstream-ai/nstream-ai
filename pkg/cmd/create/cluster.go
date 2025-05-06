@@ -131,6 +131,7 @@ func createCluster(name string) error {
 	// Get buckets
 	bucketsResp, err := c.BucketClient.ListBuckets(ctx, &clusterproto.ListBucketsRequest{
 		CloudProvider: cloudProvider,
+		AuthToken:     cfg.User.AuthToken,
 	})
 	if err != nil {
 		done <- true
@@ -210,6 +211,7 @@ func createCluster(name string) error {
 		CloudProvider: cloudProvider,
 		Bucket:        bucket,
 		Role:          userRole,
+		AuthToken:     cfg.User.AuthToken,
 	})
 	if err != nil {
 		done <- true
@@ -228,6 +230,7 @@ func createCluster(name string) error {
 		CloudProvider: cloudProvider,
 		Bucket:        bucket,
 		Role:          userRole,
+		AuthToken:     cfg.User.AuthToken,
 	})
 	if err != nil {
 		done <- true
@@ -250,6 +253,7 @@ func createCluster(name string) error {
 		Region:        region,
 		Bucket:        bucket,
 		Role:          userRole,
+		AuthToken:     cfg.User.AuthToken,
 	})
 	if err != nil {
 		done <- true
