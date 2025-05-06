@@ -119,6 +119,7 @@ func signup() error {
 			OrgName:   verifyResp.UserInfo.Organization,
 			Role:      verifyResp.UserInfo.Role,
 		},
+		Cluster: config.ClusterConfig{},
 	}
 
 	// Signal loading is complete

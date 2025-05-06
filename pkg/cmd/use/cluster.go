@@ -38,9 +38,11 @@ Otherwise, you'll be prompted to select from available clusters.`,
 
 			ctx := context.Background()
 			if err := validator.ValidateAll(ctx); err != nil {
-				fmt.Println("\nAuthentication required:")
-				fmt.Println("1. Sign in: 'nsai auth signin'")
-				fmt.Println("2. Sign up: 'nsai auth signup'")
+				fmt.Println("\nAuthentication failed:")
+				fmt.Printf("Error: %v\n", err)
+				fmt.Println("\nPlease try the following:")
+				fmt.Println("1. Sign in again: 'nsai auth signin'")
+				fmt.Println("2. If that doesn't work, sign up: 'nsai auth signup'")
 				return fmt.Errorf(utils.ErrAuthRequired)
 			}
 

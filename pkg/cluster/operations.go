@@ -38,6 +38,10 @@ func NewOperations() (*Operations, error) {
 
 // ListClusters lists all available clusters
 func (o *Operations) ListClusters(ctx context.Context) ([]*clusterproto.Cluster, error) {
+	if o.config.User.AuthToken == "" {
+		return nil, fmt.Errorf("authentication token is missing. Please sign in first")
+	}
+
 	listResp, err := o.client.ClusterClient.ListClusters(ctx, &clusterproto.ListClustersRequest{
 		AuthToken: o.config.User.AuthToken,
 	})
@@ -50,6 +54,10 @@ func (o *Operations) ListClusters(ctx context.Context) ([]*clusterproto.Cluster,
 
 // GetClusterDetails gets details for a specific cluster
 func (o *Operations) GetClusterDetails(ctx context.Context, clusterName string) (*clusterproto.ClusterConfig, error) {
+	if o.config.User.AuthToken == "" {
+		return nil, fmt.Errorf("authentication token is missing. Please sign in first")
+	}
+
 	detailsResp, err := o.client.ClusterClient.GetClusterDetails(ctx, &clusterproto.GetClusterDetailsRequest{
 		ClusterName: clusterName,
 		AuthToken:   o.config.User.AuthToken,

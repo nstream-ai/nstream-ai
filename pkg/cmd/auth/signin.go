@@ -3,6 +3,8 @@ package auth
 import (
 	"context"
 	"fmt"
+	"os"
+	"text/tabwriter"
 
 	"github.com/nstreama-ai/nstream-ai-cli/pkg/banner"
 	"github.com/nstreama-ai/nstream-ai-cli/pkg/client"
@@ -117,23 +119,55 @@ func signin() error {
 	go ShowLoading("Fetching your cluster details", done)
 
 	// Get cluster details
-	listClustersResp, err := c.ClusterClient.ListClusters(ctx, &clusterproto.ListClustersRequest{})
+	listClustersResp, err := c.ClusterClient.ListClusters(ctx, &clusterproto.ListClustersRequest{
+		AuthToken: verifyResp.AuthToken,
+	})
 	if err != nil {
 		done <- true
 		return fmt.Errorf("failed to fetch cluster details: %v", err)
 	}
 
+	done <- true
+
 	if len(listClustersResp.Clusters) > 0 {
-		// Use the first cluster as default
-		cluster := listClustersResp.Clusters[0]
-		cfg.Cluster = config.ClusterConfig{
-			Name:   cluster.Id,
-			Region: cluster.Region,
+		fmt.Println("\nAvailable clusters:")
+		w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+		fmt.Fprintln(w, "ID\tRegion\tCloud\tBucket\tIdentity")
+		for i, cluster := range listClustersResp.Clusters {
+			fmt.Fprintf(w, "%d. %s\t%s\t%s\t%s\t%s\n",
+				i+1,
+				cluster.Id,
+				cluster.Region,
+				cluster.CloudProvider,
+				cluster.Bucket,
+				cluster.Role,
+			)
+		}
+		w.Flush()
+
+		fmt.Print("\nWould you like to select a cluster? (y/n): ")
+		var choice string
+		fmt.Scanln(&choice)
+
+		if choice == "y" || choice == "yes" {
+			fmt.Print("\nEnter the number of the cluster to use: ")
+			var clusterChoice int
+			fmt.Scanln(&clusterChoice)
+
+			if clusterChoice < 1 || clusterChoice > len(listClustersResp.Clusters) {
+				return fmt.Errorf("invalid cluster choice")
+			}
+
+			selectedCluster := listClustersResp.Clusters[clusterChoice-1]
+			cfg.Cluster = config.ClusterConfig{
+				Name:          selectedCluster.Id,
+				Region:        selectedCluster.Region,
+				CloudProvider: selectedCluster.CloudProvider,
+				Bucket:        selectedCluster.Bucket,
+				Role:          selectedCluster.Role,
+			}
 		}
 	}
-
-	// Signal loading is complete
-	done <- true
 
 	// Save config
 	if err := config.SaveConfig(cfg); err != nil {
@@ -144,7 +178,7 @@ func signin() error {
 	fmt.Printf("Organization: %s\n", cfg.User.OrgName)
 	fmt.Printf("Role: %s\n", cfg.User.Role)
 	if cfg.Cluster.Name != "" {
-		fmt.Printf("Current Cluster: %s (%s)\n", cfg.Cluster.Name, cfg.Cluster.Region)
+		fmt.Printf("Selected Cluster: %s (%s)\n", cfg.Cluster.Name, cfg.Cluster.Region)
 	}
 	fmt.Println("\nYou're all set! Start using NStream AI CLI with 'nsai --help'")
 	return nil
