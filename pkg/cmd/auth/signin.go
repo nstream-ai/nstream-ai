@@ -1,11 +1,14 @@
 package auth
 
 import (
+	"context"
 	"fmt"
-	"time"
 
 	"github.com/nstreama-ai/nstream-ai-cli/pkg/banner"
+	"github.com/nstreama-ai/nstream-ai-cli/pkg/client"
 	"github.com/nstreama-ai/nstream-ai-cli/pkg/config"
+	authproto "github.com/nstreama-ai/nstream-ai-cli/proto/auth"
+	clusterproto "github.com/nstreama-ai/nstream-ai-cli/proto/cluster"
 	"github.com/spf13/cobra"
 )
 
@@ -20,22 +23,6 @@ func NewSigninCmd() *cobra.Command {
 	}
 
 	return cmd
-}
-
-// dummyServiceCall simulates a gRPC service call
-func dummyServiceCall(email, password string) (*config.Config, error) {
-	// Simulate network delay
-	time.Sleep(2 * time.Second)
-
-	// Create a dummy response with just auth token
-	cfg := &config.Config{
-		User: config.UserConfig{
-			Email:     email,
-			AuthToken: "dummy-auth-token-1234567890",
-		},
-	}
-
-	return cfg, nil
 }
 
 func signin() error {
@@ -56,19 +43,38 @@ func signin() error {
 	// Start loading animation for sending password email
 	go ShowLoading("Sending password to your email", done)
 
-	// Make dummy service call to send password email
-	if err := DummySendPasswordEmail(email); err != nil {
+	// Create gRPC client
+	c, err := client.NewClient("", true, "")
+	if err != nil {
 		done <- true
-		return fmt.Errorf("failed to send password email: %v", err)
+		return fmt.Errorf("failed to create client: %v", err)
+	}
+	defer c.Close()
+
+	// Call SignIn service
+	ctx, cancel := c.WithContext(context.Background())
+	defer cancel()
+
+	signInResp, err := c.AuthClient.SignIn(ctx, &authproto.SignInRequest{
+		Email: email,
+	})
+	if err != nil {
+		done <- true
+		return fmt.Errorf("failed to send sign in request: %v", err)
+	}
+
+	if !signInResp.Success {
+		done <- true
+		return fmt.Errorf("sign in failed: %s", signInResp.Error)
 	}
 
 	// Signal loading is complete
 	done <- true
 
-	// Get password from user
-	fmt.Print("Enter the password received via email: ")
-	var password string
-	fmt.Scanln(&password)
+	// Get OTP from user
+	fmt.Print("Enter the OTP received via email: ")
+	var otp string
+	fmt.Scanln(&otp)
 
 	// Create a new channel for authentication loading
 	done = make(chan bool)
@@ -76,41 +82,70 @@ func signin() error {
 	// Start loading animation for authentication
 	go ShowLoading("Authenticating with NStream AI service", done)
 
-	// Make dummy service call
-	cfg, err := dummyServiceCall(email, password)
+	// Verify sign in with OTP
+	verifyResp, err := c.AuthClient.VerifySignIn(ctx, &authproto.VerifySignInRequest{
+		Email: email,
+		Otp:   otp,
+	})
 	if err != nil {
 		done <- true
 		return fmt.Errorf("authentication failed: %v", err)
 	}
 
+	if verifyResp.Error != "" {
+		done <- true
+		return fmt.Errorf("authentication failed: %s", verifyResp.Error)
+	}
+
+	// Create config with auth token
+	cfg := &config.Config{
+		User: config.UserConfig{
+			Email:     email,
+			AuthToken: verifyResp.AuthToken,
+			OrgName:   verifyResp.UserInfo.Organization,
+			Role:      verifyResp.UserInfo.Role,
+		},
+	}
+
 	// Signal loading is complete
 	done <- true
 
-	// Create a new channel for fetching details
+	// Create a new channel for fetching cluster details
 	done = make(chan bool)
 
-	// Start loading animation for fetching details
-	go ShowLoading("Fetching your account details", done)
+	// Start loading animation for fetching cluster details
+	go ShowLoading("Fetching your cluster details", done)
 
-	// Fetch additional user and cluster details
-	detailedCfg, err := DummyFetchUserDetails(cfg.User.AuthToken)
+	// Get cluster details
+	listClustersResp, err := c.ClusterClient.ListClusters(ctx, &clusterproto.ListClustersRequest{})
 	if err != nil {
 		done <- true
-		return fmt.Errorf("failed to fetch account details: %v", err)
+		return fmt.Errorf("failed to fetch cluster details: %v", err)
+	}
+
+	if len(listClustersResp.Clusters) > 0 {
+		// Use the first cluster as default
+		cluster := listClustersResp.Clusters[0]
+		cfg.Cluster = config.ClusterConfig{
+			Name:   cluster.Id,
+			Region: cluster.Region,
+		}
 	}
 
 	// Signal loading is complete
 	done <- true
 
 	// Save config
-	if err := config.SaveConfig(detailedCfg); err != nil {
+	if err := config.SaveConfig(cfg); err != nil {
 		return fmt.Errorf("failed to save config: %v", err)
 	}
 
 	fmt.Println("\nSuccessfully signed in!")
-	fmt.Printf("Organization: %s\n", detailedCfg.User.OrgName)
-	fmt.Printf("Role: %s\n", detailedCfg.User.Role)
-	fmt.Printf("Current Cluster: %s (%s)\n", detailedCfg.Cluster.Name, detailedCfg.Cluster.Region)
+	fmt.Printf("Organization: %s\n", cfg.User.OrgName)
+	fmt.Printf("Role: %s\n", cfg.User.Role)
+	if cfg.Cluster.Name != "" {
+		fmt.Printf("Current Cluster: %s (%s)\n", cfg.Cluster.Name, cfg.Cluster.Region)
+	}
 	fmt.Println("\nYou're all set! Start using NStream AI CLI with 'nsai --help'")
 	return nil
 }

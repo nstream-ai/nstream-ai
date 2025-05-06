@@ -1,0 +1,129 @@
+syntax = "proto3";
+
+package cluster;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/nstream-ai/mothership/proto/cluster";
+
+// Cluster service definition
+service ClusterService {
+  // ListClusters retrieves a list of available clusters
+  rpc ListClusters(ListClustersRequest) returns (ListClustersResponse) {}
+  
+  // VerifyClusterExists checks if a specific cluster exists
+  rpc VerifyClusterExists(VerifyClusterExistsRequest) returns (VerifyClusterExistsResponse) {}
+  
+  // GetClusterDetails retrieves detailed information about a specific cluster
+  rpc GetClusterDetails(GetClusterDetailsRequest) returns (GetClusterDetailsResponse) {}
+  
+  // CreateCluster creates a new cluster
+  rpc CreateCluster(CreateClusterRequest) returns (CreateClusterResponse) {}
+}
+
+// Bucket service definition
+service BucketService {
+  // ListBuckets retrieves a list of available buckets
+  rpc ListBuckets(ListBucketsRequest) returns (ListBucketsResponse) {}
+  
+  // VerifyBucketAccess verifies access to a specific bucket
+  rpc VerifyBucketAccess(VerifyBucketAccessRequest) returns (VerifyBucketAccessResponse) {}
+  
+  // CheckResourceReadiness checks if all required resources are ready
+  rpc CheckResourceReadiness(CheckResourceReadinessRequest) returns (CheckResourceReadinessResponse) {}
+}
+
+// Cluster messages
+message ListClustersRequest {}
+
+message ListClustersResponse {
+  repeated Cluster clusters = 1;
+}
+
+message Cluster {
+  string id = 1;
+  string region = 2;
+  string cloud_provider = 3;
+  string bucket = 4;
+  string role = 5;
+}
+
+message VerifyClusterExistsRequest {
+  string cluster_name = 1;
+}
+
+message VerifyClusterExistsResponse {
+  bool exists = 1;
+  string error = 2;
+}
+
+message GetClusterDetailsRequest {
+  string cluster_name = 1;
+}
+
+message GetClusterDetailsResponse {
+  ClusterConfig config = 1;
+  string error = 2;
+}
+
+message ClusterConfig {
+  string name = 1;
+  string region = 2;
+  string cloud_provider = 3;
+  string bucket = 4;
+  string role = 5;
+  string cluster_token = 6;
+}
+
+message CreateClusterRequest {
+  string name = 1;
+  string type = 2;
+  string cloud_provider = 3;
+  string region = 4;
+  string bucket = 5;
+  string role = 6;
+}
+
+message CreateClusterResponse {
+  ClusterConfig config = 1;
+  string error = 2;
+}
+
+// Bucket messages
+message ListBucketsRequest {
+  string cloud_provider = 1;
+}
+
+message ListBucketsResponse {
+  repeated Bucket buckets = 1;
+}
+
+message Bucket {
+  string name = 1;
+  string region = 2;
+  string provider = 3;
+  string size = 4;
+  google.protobuf.Timestamp created_at = 5;
+}
+
+message VerifyBucketAccessRequest {
+  string cloud_provider = 1;
+  string bucket = 2;
+  string role = 3;
+}
+
+message VerifyBucketAccessResponse {
+  bool has_access = 1;
+  string error = 2;
+}
+
+message CheckResourceReadinessRequest {
+  string cloud_provider = 1;
+  string bucket = 2;
+  string role = 3;
+}
+
+message CheckResourceReadinessResponse {
+  bool ready = 1;
+  string error = 2;
+} 

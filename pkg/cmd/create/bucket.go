@@ -2,16 +2,18 @@ package create
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"text/tabwriter"
-	"time"
 
 	"github.com/nstreama-ai/nstream-ai-cli/pkg/banner"
+	"github.com/nstreama-ai/nstream-ai-cli/pkg/client"
 	"github.com/nstreama-ai/nstream-ai-cli/pkg/config"
+	clusterproto "github.com/nstreama-ai/nstream-ai-cli/proto/cluster"
 	"github.com/spf13/cobra"
 )
 
@@ -20,15 +22,6 @@ var (
 	bucketProvider string
 	bucketRegion   string
 )
-
-// MockBucket represents a bucket in the system
-type MockBucket struct {
-	Name      string
-	Region    string
-	Provider  string
-	Size      string
-	CreatedAt string
-}
 
 // NewBucketCmd creates the bucket command
 func NewBucketCmd() *cobra.Command {
@@ -84,6 +77,15 @@ that are compatible with your cluster's cloud provider.`,
 				return fmt.Errorf("authentication required")
 			}
 
+			// Initialize gRPC client
+			c, err := client.NewClient("localhost:8080", false, "")
+			if err != nil {
+				return fmt.Errorf("failed to create client: %v", err)
+			}
+			defer c.Close()
+
+			ctx := context.Background()
+
 			// Get cluster details to check cloud provider
 			var clusterCloudProvider string
 			if cfg.Cluster.Name != "" {
@@ -91,15 +93,20 @@ that are compatible with your cluster's cloud provider.`,
 				done := make(chan bool)
 				go ShowLoading("Fetching cluster details", done)
 
-				// Mock gRPC call to get cluster details
-				time.Sleep(1 * time.Second)
-				clusterDetails, err := mockGetClusterDetails(cfg.Cluster.Name)
+				// Get cluster details
+				detailsResp, err := c.ClusterClient.GetClusterDetails(ctx, &clusterproto.GetClusterDetailsRequest{
+					ClusterName: cfg.Cluster.Name,
+				})
 				if err != nil {
 					done <- true
 					return fmt.Errorf("failed to get cluster details: %v", err)
 				}
+				if detailsResp.Error != "" {
+					done <- true
+					return fmt.Errorf("failed to get cluster details: %s", detailsResp.Error)
+				}
 				done <- true
-				clusterCloudProvider = clusterDetails.CloudProvider
+				clusterCloudProvider = detailsResp.Config.CloudProvider
 			} else {
 				// If no cluster is set, ask for cloud provider
 				fmt.Println("\nNo cluster context found. Please select a cloud provider:")
@@ -131,29 +138,22 @@ that are compatible with your cluster's cloud provider.`,
 			done := make(chan bool)
 			go ShowLoading("Checking existing buckets", done)
 
-			// Mock gRPC call to get buckets
-			time.Sleep(1 * time.Second)
-			buckets, err := mockListBuckets("")
+			// List buckets
+			bucketsResp, err := c.BucketClient.ListBuckets(ctx, &clusterproto.ListBucketsRequest{
+				CloudProvider: clusterCloudProvider,
+			})
 			if err != nil {
 				done <- true
 				return fmt.Errorf("failed to get buckets: %v", err)
 			}
 			done <- true
 
-			// Filter buckets by cloud provider
-			var compatibleBuckets []MockBucket
-			for _, bucket := range buckets {
-				if bucket.Provider == clusterCloudProvider {
-					compatibleBuckets = append(compatibleBuckets, bucket)
-				}
-			}
-
 			// If there are compatible buckets, ask if user wants to use one
-			if len(compatibleBuckets) > 0 {
-				fmt.Printf("\nFound %d existing bucket(s) compatible with %s cloud provider:\n", len(compatibleBuckets), clusterCloudProvider)
+			if len(bucketsResp.Buckets) > 0 {
+				fmt.Printf("\nFound %d existing bucket(s) compatible with %s cloud provider:\n", len(bucketsResp.Buckets), clusterCloudProvider)
 				w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 				fmt.Fprintln(w, "ID\tName\tRegion\tProvider\tSize\tCreated At")
-				for i, bucket := range compatibleBuckets {
+				for i, bucket := range bucketsResp.Buckets {
 					fmt.Fprintf(w, "%d. %s\t%s\t%s\t%s\t%s\n",
 						i+1,
 						bucket.Name,
@@ -181,11 +181,11 @@ that are compatible with your cluster's cloud provider.`,
 					}
 					choice = strings.TrimSpace(choice)
 					choiceInt, err := strconv.Atoi(choice)
-					if err != nil || choiceInt < 1 || choiceInt > len(compatibleBuckets) {
+					if err != nil || choiceInt < 1 || choiceInt > len(bucketsResp.Buckets) {
 						return fmt.Errorf("invalid bucket choice")
 					}
 
-					selectedBucket := compatibleBuckets[choiceInt-1]
+					selectedBucket := bucketsResp.Buckets[choiceInt-1]
 
 					// Update config with bucket details
 					cfg.Cluster.Bucket = selectedBucket.Name
@@ -231,12 +231,22 @@ that are compatible with your cluster's cloud provider.`,
 			done = make(chan bool)
 			go ShowLoading("Creating bucket", done)
 
-			// Mock gRPC call to create bucket
-			time.Sleep(2 * time.Second)
-			bucketDetails, err := mockCreateBucket(name, region, clusterCloudProvider)
+			// Create bucket using gRPC
+			createResp, err := c.ClusterClient.CreateCluster(ctx, &clusterproto.CreateClusterRequest{
+				Name:          name,
+				Type:          "basic",
+				CloudProvider: clusterCloudProvider,
+				Region:        region,
+				Bucket:        name,
+				Role:          "",
+			})
 			if err != nil {
 				done <- true
 				return fmt.Errorf("failed to create bucket: %v", err)
+			}
+			if createResp.Error != "" {
+				done <- true
+				return fmt.Errorf("failed to create bucket: %s", createResp.Error)
 			}
 			done <- true
 
@@ -248,11 +258,9 @@ that are compatible with your cluster's cloud provider.`,
 
 			fmt.Printf("\n%s✓ Successfully created bucket%s\n", boldColor, resetColor)
 			fmt.Printf("\n%sBucket Details:%s\n", boldColor, resetColor)
-			fmt.Printf("  Name: %s\n", bucketDetails.Name)
-			fmt.Printf("  Region: %s\n", bucketDetails.Region)
-			fmt.Printf("  Provider: %s\n", bucketDetails.Provider)
-			fmt.Printf("  Size: %s\n", bucketDetails.Size)
-			fmt.Printf("  Created At: %s\n", bucketDetails.CreatedAt)
+			fmt.Printf("  Name: %s\n", createResp.Config.Bucket)
+			fmt.Printf("  Region: %s\n", createResp.Config.Region)
+			fmt.Printf("  Provider: %s\n", createResp.Config.CloudProvider)
 			return nil
 		},
 	}
@@ -262,74 +270,4 @@ that are compatible with your cluster's cloud provider.`,
 	cmd.Flags().StringVarP(&bucketRegion, "region", "r", "", "Region for the bucket")
 
 	return cmd
-}
-
-// MockCreateBucket simulates creating a new bucket
-func mockCreateBucket(name, region, provider string) (*MockBucket, error) {
-	// Simulate gRPC call delay
-	time.Sleep(2 * time.Second)
-
-	// Return mock bucket details
-	return &MockBucket{
-		Name:      name,
-		Region:    region,
-		Provider:  provider,
-		Size:      "0 B",
-		CreatedAt: time.Now().Format("2006-01-02"),
-	}, nil
-}
-
-// MockListBuckets simulates listing available buckets
-func mockListBuckets(clusterName string) ([]MockBucket, error) {
-	// Simulate gRPC call delay
-	time.Sleep(1 * time.Second)
-
-	// Return mock buckets
-	return []MockBucket{
-		{
-			Name:      "bucket-1",
-			Region:    "us-west-2",
-			Provider:  "aws",
-			Size:      "1.2 TB",
-			CreatedAt: "2024-01-01",
-		},
-		{
-			Name:      "bucket-2",
-			Region:    "us-central1",
-			Provider:  "gcp",
-			Size:      "2.5 TB",
-			CreatedAt: "2024-02-01",
-		},
-		{
-			Name:      "bucket-3",
-			Region:    "eastus",
-			Provider:  "azure",
-			Size:      "3.1 TB",
-			CreatedAt: "2024-03-01",
-		},
-	}, nil
-}
-
-// MockGetClusterDetails simulates getting cluster details
-func mockGetClusterDetails(clusterName string) (*MockCluster, error) {
-	// Simulate gRPC call delay
-	time.Sleep(1 * time.Second)
-
-	// Return mock cluster details
-	return &MockCluster{
-		ID:            clusterName,
-		Region:        "us-west-2",
-		CloudProvider: "aws",
-		Bucket:        "",
-		Role:          "",
-	}, nil
-}
-
-// MockCluster represents a cluster in the system
-type MockCluster struct {
-	ID            string
-	Region        string
-	CloudProvider string
-	Bucket        string
-	Role          string
 }

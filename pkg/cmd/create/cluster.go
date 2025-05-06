@@ -1,14 +1,17 @@
 package create
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"text/tabwriter"
-	"time"
 
-	"github.com/nstreama-ai/nstream-ai-cli/pkg/api"
 	"github.com/nstreama-ai/nstream-ai-cli/pkg/banner"
+	"github.com/nstreama-ai/nstream-ai-cli/pkg/client"
 	"github.com/nstreama-ai/nstream-ai-cli/pkg/config"
+	"github.com/nstreama-ai/nstream-ai-cli/pkg/utils"
+	authproto "github.com/nstreama-ai/nstream-ai-cli/proto/auth"
+	clusterproto "github.com/nstreama-ai/nstream-ai-cli/proto/cluster"
 	"github.com/spf13/cobra"
 )
 
@@ -61,23 +64,42 @@ func createCluster(name string) error {
 		return fmt.Errorf("authentication required")
 	}
 
-	// Check if user exists
-	valid, err := api.MockValidateUser(cfg.User.Email)
-	if err != nil || !valid {
+	// Create gRPC client
+	c, err := client.NewClient("", true, "")
+	if err != nil {
+		return fmt.Errorf("failed to create client: %v", err)
+	}
+	defer c.Close()
+
+	// Create context
+	ctx, cancel := c.WithContext(context.Background())
+	defer cancel()
+
+	// Validate user
+	validateResp, err := c.AuthClient.ValidateUser(ctx, &authproto.ValidateUserRequest{
+		Email: cfg.User.Email,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to validate user: %v", err)
+	}
+
+	if !validateResp.Valid {
 		fmt.Println("User validation failed. Please authenticate first:")
 		fmt.Println("1. Sign in: 'nsai auth signin'")
 		fmt.Println("2. Sign up: 'nsai auth signup'")
 		return fmt.Errorf("authentication required")
 	}
 
-	// Check if token is valid
-	resp, err := api.MockValidateToken(cfg.User.AuthToken)
+	// Validate token
+	tokenResp, err := c.AuthClient.ValidateToken(ctx, &authproto.ValidateTokenRequest{
+		Token: cfg.User.AuthToken,
+	})
 	if err != nil {
 		return fmt.Errorf("error validating token: %v", err)
 	}
 
-	if !resp.Valid {
-		fmt.Printf("Authentication token is invalid: %s\n", resp.Error)
+	if !tokenResp.Valid {
+		fmt.Printf("Authentication token is invalid: %s\n", tokenResp.Error)
 		fmt.Println("\nPlease authenticate first:")
 		fmt.Println("1. Sign in: 'nsai auth signin'")
 		fmt.Println("2. Sign up: 'nsai auth signup'")
@@ -106,30 +128,25 @@ func createCluster(name string) error {
 	done := make(chan bool)
 	go ShowLoading("Checking existing buckets", done)
 
-	// Mock gRPC call to get buckets
-	time.Sleep(1 * time.Second)
-	buckets, err := mockListBuckets("")
+	// Get buckets
+	bucketsResp, err := c.BucketClient.ListBuckets(ctx, &clusterproto.ListBucketsRequest{
+		CloudProvider: cloudProvider,
+	})
 	if err != nil {
 		done <- true
 		return fmt.Errorf("failed to get buckets: %v", err)
 	}
 	done <- true
 
-	// Filter buckets by cloud provider
-	var compatibleBuckets []MockBucket
-	for _, bucket := range buckets {
-		if bucket.Provider == cloudProvider {
-			compatibleBuckets = append(compatibleBuckets, bucket)
-		}
-	}
-
 	var bucket string
+	var userRole string
+
 	// If there are compatible buckets, ask if user wants to use one
-	if len(compatibleBuckets) > 0 {
-		fmt.Printf("\nFound %d existing bucket(s) compatible with %s cloud provider:\n", len(compatibleBuckets), cloudProvider)
+	if len(bucketsResp.Buckets) > 0 {
+		fmt.Printf("\nFound %d existing bucket(s) compatible with %s cloud provider:\n", len(bucketsResp.Buckets), cloudProvider)
 		w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 		fmt.Fprintln(w, "ID\tName\tRegion\tProvider\tSize\tCreated At")
-		for i, b := range compatibleBuckets {
+		for i, b := range bucketsResp.Buckets {
 			fmt.Fprintf(w, "%d. %s\t%s\t%s\t%s\t%s\n",
 				i+1,
 				b.Name,
@@ -150,11 +167,11 @@ func createCluster(name string) error {
 			var choice int
 			fmt.Scanln(&choice)
 
-			if choice < 1 || choice > len(compatibleBuckets) {
+			if choice < 1 || choice > len(bucketsResp.Buckets) {
 				return fmt.Errorf("invalid bucket choice")
 			}
 
-			bucket = compatibleBuckets[choice-1].Name
+			bucket = bucketsResp.Buckets[choice-1].Name
 		} else {
 			// Get new bucket name
 			fmt.Print("\nEnter your bucket name: ")
@@ -168,7 +185,6 @@ func createCluster(name string) error {
 
 	// Get role/principal for bucket access
 	fmt.Printf("\nEnter the name for your bucket access %s: ", getRoleType(cloudProvider))
-	var userRole string
 	fmt.Scanln(&userRole)
 
 	// Get NStream service role
@@ -190,18 +206,36 @@ func createCluster(name string) error {
 	// Verify bucket access
 	done = make(chan bool)
 	go ShowLoading("Verifying bucket access", done)
-	if err := VerifyBucketAccess(cloudProvider, bucket, userRole); err != nil {
+	accessResp, err := c.BucketClient.VerifyBucketAccess(ctx, &clusterproto.VerifyBucketAccessRequest{
+		CloudProvider: cloudProvider,
+		Bucket:        bucket,
+		Role:          userRole,
+	})
+	if err != nil {
 		done <- true
 		return fmt.Errorf("failed to verify bucket access: %v", err)
+	}
+	if !accessResp.HasAccess {
+		done <- true
+		return fmt.Errorf("bucket access verification failed: %s", accessResp.Error)
 	}
 	done <- true
 
 	// Check resource readiness
 	done = make(chan bool)
 	go ShowLoading("Checking resource readiness", done)
-	if err := CheckResourceReadiness(cloudProvider, bucket, userRole); err != nil {
+	readyResp, err := c.BucketClient.CheckResourceReadiness(ctx, &clusterproto.CheckResourceReadinessRequest{
+		CloudProvider: cloudProvider,
+		Bucket:        bucket,
+		Role:          userRole,
+	})
+	if err != nil {
 		done <- true
-		return fmt.Errorf("resources not ready: %v", err)
+		return fmt.Errorf("failed to check resource readiness: %v", err)
+	}
+	if !readyResp.Ready {
+		done <- true
+		return fmt.Errorf("resources not ready: %s", readyResp.Error)
 	}
 	done <- true
 
@@ -209,28 +243,47 @@ func createCluster(name string) error {
 	done = make(chan bool)
 	go ShowLoading("Creating your NStream AI cluster", done)
 
-	clusterConfig, err := DummyCreateCluster(name, clusterType, cloudProvider, region, bucket, userRole)
+	createResp, err := c.ClusterClient.CreateCluster(ctx, &clusterproto.CreateClusterRequest{
+		Name:          name,
+		Type:          clusterType,
+		CloudProvider: cloudProvider,
+		Region:        region,
+		Bucket:        bucket,
+		Role:          userRole,
+	})
 	if err != nil {
 		done <- true
 		return fmt.Errorf("failed to create cluster: %v", err)
 	}
+	if createResp.Error != "" {
+		done <- true
+		return fmt.Errorf("failed to create cluster: %s", createResp.Error)
+	}
 	done <- true
 
-	// Update config
-	cfg.Cluster = *clusterConfig
+	// Update config with cluster details
+	cfg.Cluster = config.ClusterConfig{
+		Name:          createResp.Config.Name,
+		Region:        createResp.Config.Region,
+		CloudProvider: createResp.Config.CloudProvider,
+		Bucket:        createResp.Config.Bucket,
+		Role:          createResp.Config.Role,
+		ClusterToken:  createResp.Config.ClusterToken,
+	}
 	if err := config.SaveConfig(cfg); err != nil {
 		return fmt.Errorf("failed to save config: %v", err)
 	}
 
-	fmt.Println("\nSuccessfully created cluster!")
-	fmt.Printf("Name: %s\n", clusterConfig.Name)
-	fmt.Printf("Type: %s\n", clusterType)
-	fmt.Printf("Cloud Provider: %s\n", cloudProvider)
-	fmt.Printf("Region: %s\n", region)
-	fmt.Printf("Bucket: %s\n", bucket)
-	fmt.Printf("Bucket Access %s: %s\n", getRoleType(cloudProvider), userRole)
-	fmt.Printf("NStream Service Role: %s\n", serviceRole)
-	fmt.Println("\nYou can now use this cluster with 'nsai cluster use " + name + "'")
+	fmt.Printf("\n%s✓ Successfully created cluster!%s\n", utils.BoldColor, utils.ResetColor)
+	fmt.Printf("\n%sCluster Details:%s\n", utils.BoldColor, utils.ResetColor)
+	fmt.Printf("  Name: %s\n", createResp.Config.Name)
+	fmt.Printf("  Type: %s\n", clusterType)
+	fmt.Printf("  Cloud Provider: %s\n", cloudProvider)
+	fmt.Printf("  Region: %s\n", region)
+	fmt.Printf("  Bucket: %s\n", bucket)
+	fmt.Printf("  Bucket Access %s: %s\n", getRoleType(cloudProvider), userRole)
+	fmt.Printf("  NStream Service Role: %s\n", serviceRole)
+	fmt.Printf("\n%sYou can now use this cluster with 'nsai use cluster %s'%s\n", utils.BoldColor, name, utils.ResetColor)
 
 	return nil
 }

@@ -1,11 +1,13 @@
 package auth
 
 import (
+	"context"
 	"fmt"
-	"time"
 
 	"github.com/nstreama-ai/nstream-ai-cli/pkg/banner"
+	"github.com/nstreama-ai/nstream-ai-cli/pkg/client"
 	"github.com/nstreama-ai/nstream-ai-cli/pkg/config"
+	authproto "github.com/nstreama-ai/nstream-ai-cli/proto/auth"
 	"github.com/spf13/cobra"
 )
 
@@ -20,23 +22,6 @@ func NewSignupCmd() *cobra.Command {
 	}
 
 	return cmd
-}
-
-// dummySignupServiceCall simulates a gRPC service call for signup
-func dummySignupServiceCall(email, org, name, role, password string) (*config.Config, error) {
-	// Simulate network delay for signup process
-	time.Sleep(3 * time.Second)
-	// Create a dummy response with just auth token
-	cfg := &config.Config{
-		User: config.UserConfig{
-			Email:     email,
-			AuthToken: "dummy-signup-token-1234567890",
-			OrgName:   org,
-			Role:      role,
-		},
-	}
-
-	return cfg, nil
 }
 
 func signup() error {
@@ -69,19 +54,41 @@ func signup() error {
 	// Start loading animation for sending password email
 	go ShowLoading("Sending password to your email", done)
 
-	// Make dummy service call to send password email
-	if err := DummySendPasswordEmail(email); err != nil {
+	// Create gRPC client
+	c, err := client.NewClient("", true, "")
+	if err != nil {
 		done <- true
-		return fmt.Errorf("failed to send password email: %v", err)
+		return fmt.Errorf("failed to create client: %v", err)
+	}
+	defer c.Close()
+
+	// Call SignUp service
+	ctx, cancel := c.WithContext(context.Background())
+	defer cancel()
+
+	signUpResp, err := c.AuthClient.SignUp(ctx, &authproto.SignUpRequest{
+		Email:        email,
+		Name:         name,
+		Organization: org,
+		Role:         role,
+	})
+	if err != nil {
+		done <- true
+		return fmt.Errorf("failed to send sign up request: %v", err)
+	}
+
+	if !signUpResp.Success {
+		done <- true
+		return fmt.Errorf("sign up failed: %s", signUpResp.Error)
 	}
 
 	// Signal loading is complete
 	done <- true
 
-	// Get password from user
-	fmt.Print("Enter the password received via email: ")
-	var password string
-	fmt.Scanln(&password)
+	// Get OTP from user
+	fmt.Print("Enter the OTP received via email: ")
+	var otp string
+	fmt.Scanln(&otp)
 
 	// Create a new channel for signup loading
 	done = make(chan bool)
@@ -89,41 +96,42 @@ func signup() error {
 	// Start loading animation for signup process
 	go ShowLoading("Creating your NStream AI account", done)
 
-	// Make dummy service call for signup
-	cfg, err := dummySignupServiceCall(email, org, name, role, password)
+	// Verify sign up with OTP
+	verifyResp, err := c.AuthClient.VerifySignUp(ctx, &authproto.VerifySignUpRequest{
+		Email: email,
+		Otp:   otp,
+	})
 	if err != nil {
 		done <- true
 		return fmt.Errorf("signup failed: %v", err)
 	}
 
-	// Signal loading is complete
-	done <- true
-
-	// Create a new channel for fetching details
-	done = make(chan bool)
-
-	// Start loading animation for fetching details
-	go ShowLoading("Setting up your account and cluster", done)
-
-	// Fetch additional user and cluster details
-	detailedCfg, err := DummyFetchUserDetails(cfg.User.AuthToken)
-	if err != nil {
+	if verifyResp.Error != "" {
 		done <- true
-		return fmt.Errorf("failed to setup account: %v", err)
+		return fmt.Errorf("signup failed: %s", verifyResp.Error)
+	}
+
+	// Create config with auth token
+	cfg := &config.Config{
+		User: config.UserConfig{
+			Email:     email,
+			AuthToken: verifyResp.AuthToken,
+			OrgName:   verifyResp.UserInfo.Organization,
+			Role:      verifyResp.UserInfo.Role,
+		},
 	}
 
 	// Signal loading is complete
 	done <- true
 
 	// Save config
-	if err := config.SaveConfig(detailedCfg); err != nil {
+	if err := config.SaveConfig(cfg); err != nil {
 		return fmt.Errorf("failed to save config: %v", err)
 	}
 
 	fmt.Println("\nSuccessfully signed up!")
-	fmt.Printf("Organization: %s\n", detailedCfg.User.OrgName)
-	fmt.Printf("Role: %s\n", detailedCfg.User.Role)
-	fmt.Printf("Current Cluster: %s (%s)\n", detailedCfg.Cluster.Name, detailedCfg.Cluster.Region)
+	fmt.Printf("Organization: %s\n", cfg.User.OrgName)
+	fmt.Printf("Role: %s\n", cfg.User.Role)
 	fmt.Println("\nYou're all set! Start using NStream AI CLI with 'nsai --help'")
 	return nil
 }

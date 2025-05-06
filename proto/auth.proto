@@ -1,0 +1,120 @@
+syntax = "proto3";
+
+package auth;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/nstream-ai/mothership/proto/auth";
+
+// Authentication service definition
+service AuthService {
+  // SignIn initiates the sign-in process
+  rpc SignIn(SignInRequest) returns (SignInResponse) {}
+  
+  // VerifySignIn verifies the one-time password
+  rpc VerifySignIn(VerifySignInRequest) returns (VerifySignInResponse) {}
+  
+  // SignUp initiates the sign-up process
+  rpc SignUp(SignUpRequest) returns (SignUpResponse) {}
+  
+  // VerifySignUp verifies the one-time password and completes registration
+  rpc VerifySignUp(VerifySignUpRequest) returns (VerifySignUpResponse) {}
+  
+  // ValidateUser checks if a user exists
+  rpc ValidateUser(ValidateUserRequest) returns (ValidateUserResponse) {}
+  
+  // ValidateToken validates an authentication token
+  rpc ValidateToken(ValidateTokenRequest) returns (ValidateTokenResponse) {}
+  
+  // ValidateClusterToken validates a cluster-specific token
+  rpc ValidateClusterToken(ValidateClusterTokenRequest) returns (ValidateClusterTokenResponse) {}
+}
+
+// SignIn request/response
+message SignInRequest {
+  string email = 1;
+}
+
+message SignInResponse {
+  bool success = 1;
+  string error = 2;
+}
+
+// VerifySignIn request/response
+message VerifySignInRequest {
+  string email = 1;
+  string otp = 2;
+}
+
+message VerifySignInResponse {
+  string auth_token = 1;
+  google.protobuf.Timestamp expires_at = 2;
+  UserInfo user_info = 3;
+  string error = 4;
+}
+
+// SignUp request/response
+message SignUpRequest {
+  string email = 1;
+  string name = 2;
+  string organization = 3;
+  string role = 4;
+}
+
+message SignUpResponse {
+  bool success = 1;
+  string error = 2;
+}
+
+// VerifySignUp request/response
+message VerifySignUpRequest {
+  string email = 1;
+  string otp = 2;
+}
+
+message VerifySignUpResponse {
+  string auth_token = 1;
+  google.protobuf.Timestamp expires_at = 2;
+  UserInfo user_info = 3;
+  string error = 4;
+}
+
+// ValidateUser request/response
+message ValidateUserRequest {
+  string email = 1;
+}
+
+message ValidateUserResponse {
+  bool valid = 1;
+  string error = 2;
+}
+
+// ValidateToken request/response
+message ValidateTokenRequest {
+  string token = 1;
+}
+
+message ValidateTokenResponse {
+  bool valid = 1;
+  google.protobuf.Timestamp expires_at = 2;
+  string error = 3;
+}
+
+// ValidateClusterToken request/response
+message ValidateClusterTokenRequest {
+  string token = 1;
+}
+
+message ValidateClusterTokenResponse {
+  bool valid = 1;
+  google.protobuf.Timestamp expires_at = 2;
+  string error = 3;
+}
+
+// Common message types
+message UserInfo {
+  string email = 1;
+  string organization = 2;
+  string role = 3;
+  string current_cluster = 4;
+} 

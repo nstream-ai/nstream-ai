@@ -1,15 +1,19 @@
 package use
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strconv"
 	"text/tabwriter"
-	"time"
 
 	"github.com/nstreama-ai/nstream-ai-cli/pkg/banner"
+	"github.com/nstreama-ai/nstream-ai-cli/pkg/client"
 	"github.com/nstreama-ai/nstream-ai-cli/pkg/config"
+	"github.com/nstreama-ai/nstream-ai-cli/pkg/utils"
+	authproto "github.com/nstreama-ai/nstream-ai-cli/proto/auth"
+	clusterproto "github.com/nstreama-ai/nstream-ai-cli/proto/cluster"
 	"github.com/spf13/cobra"
 )
 
@@ -18,15 +22,6 @@ var (
 	bucketRoleName    string
 	bucketClusterName string
 )
-
-// MockBucket represents a bucket in the system
-type MockBucket struct {
-	Name      string
-	Region    string
-	Provider  string
-	Size      string
-	CreatedAt string
-}
 
 // NewBucketCmd creates the bucket use command
 func NewBucketCmd() *cobra.Command {
@@ -71,11 +66,45 @@ You must have a cluster context set or provide a cluster name to use this comman
 				return fmt.Errorf("authentication required")
 			}
 
-			// Check if user exists
-			if cfg.User.Email == "" {
-				fmt.Println("No user found. You need to sign in first.")
-				fmt.Println("\nRun 'nsai auth signin' to authenticate")
-				fmt.Println("After authentication, run 'nsai use bucket' again")
+			// Create gRPC client
+			c, err := client.NewClient("", true, "")
+			if err != nil {
+				return fmt.Errorf("failed to create client: %v", err)
+			}
+			defer c.Close()
+
+			// Create context
+			ctx, cancel := c.WithContext(context.Background())
+			defer cancel()
+
+			// Validate user
+			validateResp, err := c.AuthClient.ValidateUser(ctx, &authproto.ValidateUserRequest{
+				Email: cfg.User.Email,
+			})
+			if err != nil {
+				return fmt.Errorf("failed to validate user: %v", err)
+			}
+
+			if !validateResp.Valid {
+				fmt.Println("User validation failed. Please authenticate first:")
+				fmt.Println("1. Sign in: 'nsai auth signin'")
+				fmt.Println("2. Sign up: 'nsai auth signup'")
+				return fmt.Errorf("authentication required")
+			}
+
+			// Validate token
+			tokenResp, err := c.AuthClient.ValidateToken(ctx, &authproto.ValidateTokenRequest{
+				Token: cfg.User.AuthToken,
+			})
+			if err != nil {
+				return fmt.Errorf("error validating token: %v", err)
+			}
+
+			if !tokenResp.Valid {
+				fmt.Printf("Authentication token is invalid: %s\n", tokenResp.Error)
+				fmt.Println("\nPlease authenticate first:")
+				fmt.Println("1. Sign in: 'nsai auth signin'")
+				fmt.Println("2. Sign up: 'nsai auth signup'")
 				return fmt.Errorf("authentication required")
 			}
 
@@ -86,11 +115,10 @@ You must have a cluster context set or provide a cluster name to use this comman
 			} else if cfg.Cluster.Name != "" {
 				// Create a channel for loading animation
 				done := make(chan bool)
-				go ShowLoading("Fetching available clusters", done)
+				go utils.ShowLoading(utils.LoadingConfig{Message: "Fetching available clusters"}, done)
 
-				// Mock gRPC call to get clusters
-				time.Sleep(1 * time.Second)
-				clusters, err := mockListClusters()
+				// List clusters
+				listResp, err := c.ClusterClient.ListClusters(ctx, &clusterproto.ListClustersRequest{})
 				if err != nil {
 					done <- true
 					return fmt.Errorf("failed to get clusters: %v", err)
@@ -98,7 +126,7 @@ You must have a cluster context set or provide a cluster name to use this comman
 
 				done <- true
 
-				if len(clusters) == 0 {
+				if len(listResp.Clusters) == 0 {
 					fmt.Println("\nNo clusters available.")
 					fmt.Println("Please create a cluster first using 'nsai create cluster'")
 					return fmt.Errorf("no clusters available")
@@ -108,10 +136,10 @@ You must have a cluster context set or provide a cluster name to use this comman
 				fmt.Println("\nAvailable clusters:")
 				w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 				fmt.Fprintln(w, "ID\tRegion\tCloud\tBucket\tIdentity")
-				for i, cluster := range clusters {
+				for i, cluster := range listResp.Clusters {
 					fmt.Fprintf(w, "%d. %s\t%s\t%s\t%s\t%s\n",
 						i+1,
-						cluster.ID,
+						cluster.Id,
 						cluster.Region,
 						cluster.CloudProvider,
 						cluster.Bucket,
@@ -130,19 +158,18 @@ You must have a cluster context set or provide a cluster name to use this comman
 				} else {
 					// Convert choice to integer
 					choiceInt, err := strconv.Atoi(choice)
-					if err != nil || choiceInt < 1 || choiceInt > len(clusters) {
+					if err != nil || choiceInt < 1 || choiceInt > len(listResp.Clusters) {
 						return fmt.Errorf("invalid cluster choice")
 					}
-					clusterName = clusters[choiceInt-1].ID
+					clusterName = listResp.Clusters[choiceInt-1].Id
 				}
 			} else {
 				// Create a channel for loading animation
 				done := make(chan bool)
-				go ShowLoading("Fetching available clusters", done)
+				go utils.ShowLoading(utils.LoadingConfig{Message: "Fetching available clusters"}, done)
 
-				// Mock gRPC call to get clusters
-				time.Sleep(1 * time.Second)
-				clusters, err := mockListClusters()
+				// List clusters
+				listResp, err := c.ClusterClient.ListClusters(ctx, &clusterproto.ListClustersRequest{})
 				if err != nil {
 					done <- true
 					return fmt.Errorf("failed to get clusters: %v", err)
@@ -150,7 +177,7 @@ You must have a cluster context set or provide a cluster name to use this comman
 
 				done <- true
 
-				if len(clusters) == 0 {
+				if len(listResp.Clusters) == 0 {
 					fmt.Println("\nNo clusters available.")
 					fmt.Println("Please create a cluster first using 'nsai create cluster'")
 					return fmt.Errorf("no clusters available")
@@ -160,10 +187,10 @@ You must have a cluster context set or provide a cluster name to use this comman
 				fmt.Println("\nAvailable clusters:")
 				w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 				fmt.Fprintln(w, "ID\tRegion\tCloud\tBucket\tIdentity")
-				for i, cluster := range clusters {
+				for i, cluster := range listResp.Clusters {
 					fmt.Fprintf(w, "%d. %s\t%s\t%s\t%s\t%s\n",
 						i+1,
-						cluster.ID,
+						cluster.Id,
 						cluster.Region,
 						cluster.CloudProvider,
 						cluster.Bucket,
@@ -176,11 +203,11 @@ You must have a cluster context set or provide a cluster name to use this comman
 				var choice int
 				fmt.Scanf("%d", &choice)
 
-				if choice < 1 || choice > len(clusters) {
+				if choice < 1 || choice > len(listResp.Clusters) {
 					return fmt.Errorf("invalid cluster choice")
 				}
 
-				clusterName = clusters[choice-1].ID
+				clusterName = listResp.Clusters[choice-1].Id
 			}
 
 			// Get bucket name from args or flag
@@ -195,11 +222,26 @@ You must have a cluster context set or provide a cluster name to use this comman
 			if bucketName == "" {
 				// Create a channel for loading animation
 				done := make(chan bool)
-				go ShowLoading("Fetching available buckets", done)
+				go utils.ShowLoading(utils.LoadingConfig{Message: "Fetching available buckets"}, done)
 
-				// Mock gRPC call to get buckets
-				time.Sleep(2 * time.Second)
-				buckets, err := mockListBuckets(clusterName)
+				// Get cluster details to check cloud provider
+				detailsResp, err := c.ClusterClient.GetClusterDetails(ctx, &clusterproto.GetClusterDetailsRequest{
+					ClusterName: clusterName,
+				})
+				if err != nil {
+					done <- true
+					return fmt.Errorf("failed to get cluster details: %v", err)
+				}
+
+				if detailsResp.Error != "" {
+					done <- true
+					return fmt.Errorf("failed to get cluster details: %s", detailsResp.Error)
+				}
+
+				// List buckets
+				bucketsResp, err := c.BucketClient.ListBuckets(ctx, &clusterproto.ListBucketsRequest{
+					CloudProvider: detailsResp.Config.CloudProvider,
+				})
 				if err != nil {
 					done <- true
 					return fmt.Errorf("failed to get buckets: %v", err)
@@ -207,7 +249,7 @@ You must have a cluster context set or provide a cluster name to use this comman
 
 				done <- true
 
-				if len(buckets) == 0 {
+				if len(bucketsResp.Buckets) == 0 {
 					fmt.Println("\nNo buckets available.")
 					fmt.Println("Please create a bucket first using 'nsai create bucket'")
 					return fmt.Errorf("no buckets available")
@@ -217,7 +259,7 @@ You must have a cluster context set or provide a cluster name to use this comman
 				fmt.Println("\nAvailable buckets:")
 				w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 				fmt.Fprintln(w, "ID\tName\tRegion\tProvider\tSize\tCreated At")
-				for i, bucket := range buckets {
+				for i, bucket := range bucketsResp.Buckets {
 					fmt.Fprintf(w, "%d. %s\t%s\t%s\t%s\t%s\n",
 						i+1,
 						bucket.Name,
@@ -233,53 +275,61 @@ You must have a cluster context set or provide a cluster name to use this comman
 				var choice int
 				fmt.Scanf("%d", &choice)
 
-				if choice < 1 || choice > len(buckets) {
+				if choice < 1 || choice > len(bucketsResp.Buckets) {
 					return fmt.Errorf("invalid bucket choice")
 				}
 
-				bucketName = buckets[choice-1].Name
-
-				// Get cluster details to check cloud provider
-				clusterDetails, err := mockGetClusterDetails(clusterName)
-				if err != nil {
-					return fmt.Errorf("failed to get cluster details: %v", err)
-				}
+				bucketName = bucketsResp.Buckets[choice-1].Name
 
 				// Check if cloud providers match
-				if clusterDetails.CloudProvider != buckets[choice-1].Provider {
+				if detailsResp.Config.CloudProvider != bucketsResp.Buckets[choice-1].Provider {
 					return fmt.Errorf("cloud provider mismatch: cluster '%s' uses '%s' but bucket '%s' uses '%s'",
-						clusterName, clusterDetails.CloudProvider, bucketName, buckets[choice-1].Provider)
-				}
-			} else {
-				// Get bucket details to check cloud provider
-				bucketDetails, err := mockGetBucketDetails(clusterName, bucketName)
-				if err != nil {
-					return fmt.Errorf("failed to get bucket details: %v", err)
-				}
-
-				// Get cluster details to check cloud provider
-				clusterDetails, err := mockGetClusterDetails(clusterName)
-				if err != nil {
-					return fmt.Errorf("failed to get cluster details: %v", err)
-				}
-
-				// Check if cloud providers match
-				if clusterDetails.CloudProvider != bucketDetails.Provider {
-					return fmt.Errorf("cloud provider mismatch: cluster '%s' uses '%s' but bucket '%s' uses '%s'",
-						clusterName, clusterDetails.CloudProvider, bucketName, bucketDetails.Provider)
+						clusterName,
+						detailsResp.Config.CloudProvider,
+						bucketName,
+						bucketsResp.Buckets[choice-1].Provider,
+					)
 				}
 			}
 
-			// Start loading animation for fetching bucket details
+			// Verify bucket access
 			done := make(chan bool)
-			go ShowLoading("Fetching bucket details", done)
+			go utils.ShowLoading(utils.LoadingConfig{Message: "Verifying bucket access"}, done)
 
-			// Mock gRPC call to get bucket details
-			time.Sleep(2 * time.Second)
-			bucketDetails, err := mockGetBucketDetails(clusterName, bucketName)
+			accessResp, err := c.BucketClient.VerifyBucketAccess(ctx, &clusterproto.VerifyBucketAccessRequest{
+				CloudProvider: cfg.Cluster.CloudProvider,
+				Bucket:        bucketName,
+				Role:          cfg.Cluster.Role,
+			})
 			if err != nil {
 				done <- true
-				return fmt.Errorf("failed to get bucket details: %v", err)
+				return fmt.Errorf("failed to verify bucket access: %v", err)
+			}
+
+			if !accessResp.HasAccess {
+				done <- true
+				return fmt.Errorf("bucket access verification failed: %s", accessResp.Error)
+			}
+
+			done <- true
+
+			// Check resource readiness
+			done = make(chan bool)
+			go utils.ShowLoading(utils.LoadingConfig{Message: "Checking resource readiness"}, done)
+
+			readyResp, err := c.BucketClient.CheckResourceReadiness(ctx, &clusterproto.CheckResourceReadinessRequest{
+				CloudProvider: cfg.Cluster.CloudProvider,
+				Bucket:        bucketName,
+				Role:          cfg.Cluster.Role,
+			})
+			if err != nil {
+				done <- true
+				return fmt.Errorf("failed to check resource readiness: %v", err)
+			}
+
+			if !readyResp.Ready {
+				done <- true
+				return fmt.Errorf("resources not ready: %s", readyResp.Error)
 			}
 
 			done <- true
@@ -290,20 +340,20 @@ You must have a cluster context set or provide a cluster name to use this comman
 				return fmt.Errorf("failed to save config: %v", err)
 			}
 
-			fmt.Printf("\r%s%s✓ Successfully set bucket context%s\n", boldColor, redColor, resetColor)
-			fmt.Printf("\n%sBucket Details:%s\n", boldColor, resetColor)
-			fmt.Printf("  Name: %s\n", bucketDetails.Name)
-			fmt.Printf("  Region: %s\n", bucketDetails.Region)
-			fmt.Printf("  Provider: %s\n", bucketDetails.Provider)
-			fmt.Printf("  Size: %s\n", bucketDetails.Size)
-			fmt.Printf("  Created At: %s\n", bucketDetails.CreatedAt)
-			fmt.Printf("\n%sYou can now use this bucket for operations in cluster %s.%s\n", boldColor, clusterName, resetColor)
+			fmt.Printf("\r%s%s✓ Successfully set bucket context%s\n", utils.BoldColor, utils.RedColor, utils.ResetColor)
+			fmt.Printf("\n%sBucket Details:%s\n", utils.BoldColor, utils.ResetColor)
+			fmt.Printf("  Name: %s\n", bucketName)
+			fmt.Printf("  Cluster: %s\n", clusterName)
+			fmt.Printf("  Cloud Provider: %s\n", cfg.Cluster.CloudProvider)
+			fmt.Printf("  Region: %s\n", cfg.Cluster.Region)
+			fmt.Printf("  Identity: %s\n", cfg.Cluster.Role)
+			fmt.Printf("\n%sYou can now use this bucket for operations.%s\n", utils.BoldColor, utils.ResetColor)
 			return nil
 		},
 	}
 
 	cmd.Flags().StringVarP(&bucketUseName, "name", "n", "", "Bucket name (optional, will prompt for selection if not provided)")
-	cmd.Flags().StringVarP(&bucketClusterName, "cluster", "c", "", "Cluster name (optional, will use current cluster or prompt for selection if not provided)")
+	cmd.Flags().StringVarP(&bucketClusterName, "cluster", "c", "", "Cluster name (optional, will use current cluster if not provided)")
 
 	// Role subcommand
 	roleCmd := &cobra.Command{
@@ -319,50 +369,4 @@ You must have a cluster context set or provide a cluster name to use this comman
 
 	cmd.AddCommand(roleCmd)
 	return cmd
-}
-
-// Mock gRPC service calls
-
-func mockListBuckets(clusterName string) ([]MockBucket, error) {
-	// Simulate gRPC call delay
-	time.Sleep(1 * time.Second)
-
-	// Return mock buckets
-	return []MockBucket{
-		{
-			Name:      "bucket-1",
-			Region:    "us-west-2",
-			Provider:  "aws",
-			Size:      "1.2 TB",
-			CreatedAt: "2024-01-01",
-		},
-		{
-			Name:      "bucket-2",
-			Region:    "us-central1",
-			Provider:  "gcp",
-			Size:      "2.5 TB",
-			CreatedAt: "2024-02-01",
-		},
-		{
-			Name:      "bucket-3",
-			Region:    "eastus",
-			Provider:  "azure",
-			Size:      "3.1 TB",
-			CreatedAt: "2024-03-01",
-		},
-	}, nil
-}
-
-func mockGetBucketDetails(clusterName, bucketName string) (*MockBucket, error) {
-	// Simulate gRPC call delay
-	time.Sleep(1 * time.Second)
-
-	// Return mock bucket details
-	return &MockBucket{
-		Name:      bucketName,
-		Region:    "us-west-2",
-		Provider:  "aws",
-		Size:      "1.2 TB",
-		CreatedAt: "2024-01-01",
-	}, nil
 }
