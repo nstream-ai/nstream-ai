@@ -69,7 +69,7 @@ You must have a cluster context set or provide a cluster name to use this comman
 			// Create gRPC client
 			c, err := client.NewClient("", true, "")
 			if err != nil {
-				return fmt.Errorf("failed to create client: %v", err)
+				return err // Return the original error message without wrapping
 			}
 			defer c.Close()
 

@@ -81,8 +81,11 @@ func NewClient(serverAddr string, useTLS bool, caCertPath string) (*Client, erro
 	}
 
 	// Connect to the server
-	conn, err := grpc.Dial(serverAddr, opts...)
+	conn, err := grpc.NewClient(serverAddr, opts...)
 	if err != nil {
+		if strings.Contains(err.Error(), "connection refused") {
+			return nil, fmt.Errorf("we're having trouble connecting to our servers right now. Please try again in a few minutes. If the problem persists, check your internet connection or contact support")
+		}
 		return nil, fmt.Errorf("failed to connect to server: %v", err)
 	}
 
